@@ -14,19 +14,17 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { QrCode, UserCog, Loader2, CheckCircle2, MapPin, Sparkles } from "lucide-react";
+import { QrCode, UserCog, Loader2, CheckCircle2, MapPin, Sparkles, Clock } from "lucide-react";
 import { AdminAttendanceSummary } from "@/components/admin/AdminAttendanceSummary";
 import { collection, doc, addDoc, serverTimestamp, query, orderBy, limit, setDoc, getDocs, where } from "firebase/firestore";
 import { signOut } from "firebase/auth";
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
   const { user, isUserLoading, firestore, auth } = useFirebase();
   const { toast } = useToast();
   const router = useRouter();
-  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
 
   const profileRef = useMemoFirebase(() => 
     user ? doc(firestore, 'userProfiles', user.uid) : null, 
@@ -40,7 +38,7 @@ export default function DashboardPage() {
     user ? query(
       collection(firestore, 'userProfiles', user.uid, 'attendanceRecords'),
       orderBy('date', 'desc'),
-      limit(10)
+      limit(20)
     ) : null,
   [firestore, user]);
   const { data: attendance, isLoading: isAttendanceLoading } = useCollection(attendanceQuery);
@@ -56,21 +54,21 @@ export default function DashboardPage() {
     router.push("/");
   };
 
-  const handleFullShiftMark = async () => {
-    if (!user || !profile?.shiftIds?.[0] || !shifts) return;
+  const handleFullShiftMark = async (shiftId: string) => {
+    if (!user || !shifts) return;
     
-    setIsActionLoading(true);
+    setIsActionLoading(shiftId);
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const shift = shifts.find(s => s.id === profile.shiftIds[0]);
+    const shift = shifts.find(s => s.id === shiftId);
     
     if (!shift) {
-      toast({ variant: "destructive", title: "Error", description: "No se encontró tu jornada asignada." });
-      setIsActionLoading(false);
+      toast({ variant: "destructive", title: "Error", description: "No se encontró la jornada seleccionada." });
+      setIsActionLoading(null);
       return;
     }
 
     const recordsRef = collection(firestore, 'userProfiles', user.uid, 'attendanceRecords');
-    const todayQuery = query(recordsRef, where('date', '==', todayStr), limit(1));
+    const todayQuery = query(recordsRef, where('date', '==', todayStr), where('shiftId', '==', shiftId), limit(1));
     const querySnapshot = await getDocs(todayQuery);
 
     const entryDateTime = `${todayStr}T${shift.startTime}:00`;
@@ -78,13 +76,12 @@ export default function DashboardPage() {
 
     const attendanceData = {
       userId: user.uid,
+      shiftId: shiftId,
       date: todayStr,
       entryDateTime,
       exitDateTime,
       entryMethod: 'manual',
       exitMethod: 'manual',
-      entryLocationLatitude: 0,
-      entryLocationLongitude: 0,
       isManualOverride: true,
       updatedAt: serverTimestamp()
     };
@@ -97,27 +94,28 @@ export default function DashboardPage() {
       }
       toast({ 
         title: "Jornada Completa", 
-        description: `Se ha registrado tu horario de ${shift.startTime} a ${shift.endTime} para hoy.` 
+        description: `Se registró el horario (${shift.startTime} - ${shift.endTime}) para ${shift.name}.` 
       });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "No se pudo realizar el registro." });
     } finally {
-      setIsActionLoading(false);
+      setIsActionLoading(null);
     }
   };
 
-  const handleMarkAttendance = async (type: 'entry' | 'exit', method: 'qr' | 'manual', location?: { latitude: number, longitude: number }) => {
+  const handleMarkAttendance = async (shiftId: string, type: 'entry' | 'exit', method: 'qr' | 'manual', location?: { latitude: number, longitude: number }) => {
     if (!user) return;
     
-    setIsActionLoading(true);
+    setIsActionLoading(`${shiftId}-${type}`);
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const recordsRef = collection(firestore, 'userProfiles', user.uid, 'attendanceRecords');
     
-    const todayQuery = query(recordsRef, where('date', '==', todayStr), limit(1));
+    const todayQuery = query(recordsRef, where('date', '==', todayStr), where('shiftId', '==', shiftId), limit(1));
     const querySnapshot = await getDocs(todayQuery);
     
     const attendanceData: any = {
       userId: user.uid,
+      shiftId: shiftId,
       date: todayStr,
       updatedAt: serverTimestamp()
     };
@@ -127,7 +125,6 @@ export default function DashboardPage() {
       attendanceData.entryMethod = method;
       attendanceData.entryLocationLatitude = location?.latitude || 0;
       attendanceData.entryLocationLongitude = location?.longitude || 0;
-      attendanceData.isManualOverride = method === 'manual';
     } else {
       attendanceData.exitDateTime = new Date().toISOString();
       attendanceData.exitMethod = method;
@@ -145,12 +142,12 @@ export default function DashboardPage() {
       }
       toast({ 
         title: "Registro Exitoso", 
-        description: `Se ha marcado tu ${type === 'entry' ? 'entrada' : 'salida'} correctamente via ${method.toUpperCase()}.` 
+        description: `Se ha marcado tu ${type === 'entry' ? 'entrada' : 'salida'} correctamente.` 
       });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "No se pudo registrar la asistencia." });
     } finally {
-      setIsActionLoading(false);
+      setIsActionLoading(null);
     }
   };
 
@@ -163,7 +160,7 @@ export default function DashboardPage() {
   }
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'coordinator';
-  const todayRecord = attendance?.find(r => r.date === format(new Date(), 'yyyy-MM-dd'));
+  const todayRecords = attendance?.filter(r => r.date === format(new Date(), 'yyyy-MM-dd')) || [];
 
   return (
     <div className="min-h-screen bg-[#F1F3F6]">
@@ -187,71 +184,94 @@ export default function DashboardPage() {
           </Badge>
         </header>
 
-        <AttendanceStats records={attendance} />
+        <AttendanceStats records={attendance || []} />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-4 space-y-6">
-            <Card className="border-none shadow-xl bg-white rounded-2xl overflow-hidden">
-              <CardHeader className="bg-slate-50/50">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  Registro de Jornada
-                </CardTitle>
-                <CardDescription>Opciones de cumplimiento rápido</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4">
-                <Button 
-                  onClick={handleFullShiftMark}
-                  disabled={isActionLoading || !!(todayRecord?.entryDateTime && todayRecord?.exitDateTime)}
-                  className="w-full h-14 bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 border flex items-center justify-between px-6 font-black rounded-xl"
-                >
-                  <div className="flex items-center gap-3">
-                    <Sparkles className="h-5 w-5" />
-                    <span>MARCAR JORNADA COMPLETA</span>
-                  </div>
-                  {isActionLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                </Button>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Mis Jornadas de Hoy</h2>
+            
+            {profile?.shiftIds?.map((shiftId: string) => {
+              const shift = shifts?.find(s => s.id === shiftId);
+              const record = todayRecords.find(r => r.shiftId === shiftId);
+              if (!shift) return null;
 
-                <div className="relative py-2">
-                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-100" /></div>
-                  <div className="relative flex justify-center text-[10px] uppercase font-bold text-slate-300 bg-white px-2">O marcaje parcial</div>
-                </div>
+              return (
+                <Card key={shiftId} className="border-none shadow-xl bg-white rounded-2xl overflow-hidden">
+                  <CardHeader className="bg-slate-50/50 pb-4">
+                    <CardTitle className="text-md flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-primary" />
+                        {shift.name}
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">
+                        {shift.startTime} - {shift.endTime}
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription className="text-[10px] font-bold uppercase">
+                      Tolerancia: {shift.tolerance} min
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-4">
+                    <Button 
+                      onClick={() => handleFullShiftMark(shiftId)}
+                      disabled={!!isActionLoading || (!!record?.entryDateTime && !!record?.exitDateTime)}
+                      className="w-full h-12 bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 border flex items-center justify-between px-4 font-black rounded-xl text-xs"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        <span>JORNADA COMPLETA</span>
+                      </div>
+                      {isActionLoading === shiftId && <Loader2 className="h-3 w-3 animate-spin" />}
+                    </Button>
 
-                <div className="flex items-center space-x-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                  <Checkbox 
-                    id="manual-entry" 
-                    disabled={!!todayRecord?.entryDateTime || isActionLoading}
-                    checked={!!todayRecord?.entryDateTime}
-                    onCheckedChange={(checked) => checked && handleMarkAttendance('entry', 'manual')}
-                    className="h-6 w-6"
-                  />
-                  <Label htmlFor="manual-entry" className="flex-1 cursor-pointer">
-                    <p className="font-bold text-slate-800">Entrada Manual</p>
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">
-                      {todayRecord?.entryDateTime ? `Hora: ${format(new Date(todayRecord.entryDateTime), 'HH:mm')}` : 'Pendiente'}
-                    </p>
-                  </Label>
-                </div>
+                    <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <Checkbox 
+                        id={`entry-${shiftId}`} 
+                        disabled={!!record?.entryDateTime || !!isActionLoading}
+                        checked={!!record?.entryDateTime}
+                        onCheckedChange={(checked) => checked && handleMarkAttendance(shiftId, 'entry', 'manual')}
+                      />
+                      <Label htmlFor={`entry-${shiftId}`} className="flex-1 cursor-pointer">
+                        <p className="font-bold text-slate-800 text-sm">Entrada</p>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">
+                          {record?.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : 'Pendiente'}
+                        </p>
+                      </Label>
+                    </div>
 
-                <div className="flex items-center space-x-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                  <Checkbox 
-                    id="manual-exit" 
-                    disabled={!todayRecord?.entryDateTime || !!todayRecord?.exitDateTime || isActionLoading}
-                    checked={!!todayRecord?.exitDateTime}
-                    onCheckedChange={(checked) => checked && handleMarkAttendance('exit', 'manual')}
-                    className="h-6 w-6"
-                  />
-                  <Label htmlFor="manual-exit" className="flex-1 cursor-pointer">
-                    <p className="font-bold text-slate-800">Salida Manual</p>
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">
-                      {todayRecord?.exitDateTime ? `Hora: ${format(new Date(todayRecord.exitDateTime), 'HH:mm')}` : 'Pendiente'}
-                    </p>
-                  </Label>
-                </div>
-              </CardContent>
-            </Card>
+                    <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <Checkbox 
+                        id={`exit-${shiftId}`} 
+                        disabled={!record?.entryDateTime || !!record?.exitDateTime || !!isActionLoading}
+                        checked={!!record?.exitDateTime}
+                        onCheckedChange={(checked) => checked && handleMarkAttendance(shiftId, 'exit', 'manual')}
+                      />
+                      <Label htmlFor={`exit-${shiftId}`} className="flex-1 cursor-pointer">
+                        <p className="font-bold text-slate-800 text-sm">Salida</p>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">
+                          {record?.exitDateTime ? format(new Date(record.exitDateTime), 'HH:mm') : 'Pendiente'}
+                        </p>
+                      </Label>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
 
-            <QRMarker onMark={(type, loc) => handleMarkAttendance(type, 'qr', loc)} />
+            {(!profile?.shiftIds || profile.shiftIds.length === 0) && (
+              <Card className="border-dashed border-2 bg-transparent text-center p-8">
+                <p className="text-sm text-muted-foreground">No tienes jornadas asignadas para hoy.</p>
+              </Card>
+            )}
+
+            <QRMarker onMark={(type, loc) => {
+              // Si tiene una sola jornada, marcar esa. Si no, notificar.
+              if (profile?.shiftIds?.length === 1) {
+                handleMarkAttendance(profile.shiftIds[0], type, 'qr', loc);
+              } else {
+                toast({ title: "Selección requerida", description: "Por favor usa el marcaje manual para elegir la jornada específica." });
+              }
+            }} />
 
             {isAdmin && attendance && attendance.length > 0 && (
               <AdminAttendanceSummary attendance={attendance.map(a => ({
@@ -261,8 +281,8 @@ export default function DashboardPage() {
                 date: a.date,
                 time: a.entryDateTime ? format(new Date(a.entryDateTime), 'HH:mm') : '---',
                 type: 'entry',
-                method: a.entryMethod,
-                location: { latitude: a.entryLocationLatitude, longitude: a.entryLocationLongitude }
+                method: a.entryMethod || 'manual',
+                location: { latitude: a.entryLocationLatitude || 0, longitude: a.entryLocationLongitude || 0 }
               }))} />
             )}
           </div>
@@ -271,8 +291,8 @@ export default function DashboardPage() {
             <Card className="border-none shadow-xl h-full rounded-2xl overflow-hidden bg-white">
               <CardHeader className="border-b border-slate-50 flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle>Historial Reciente</CardTitle>
-                  <CardDescription>Listado de tus últimos movimientos</CardDescription>
+                  <CardTitle>Historial de Movimientos</CardTitle>
+                  <CardDescription>Detalle por jornada y fecha</CardDescription>
                 </div>
                 <Badge variant="outline" className="font-bold border-primary/20 text-primary">
                   {attendance?.length || 0} Registros
@@ -282,45 +302,55 @@ export default function DashboardPage() {
                 <Table>
                   <TableHeader className="bg-slate-50/50">
                     <TableRow>
-                      <TableHead className="px-6">Fecha</TableHead>
+                      <TableHead className="px-6">Fecha / Jornada</TableHead>
                       <TableHead>Entrada / Salida</TableHead>
                       <TableHead>Método</TableHead>
                       <TableHead className="text-right px-6">Estado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {attendance?.map((record) => (
-                      <TableRow key={record.id} className="hover:bg-slate-50/30 transition-colors border-slate-50">
-                        <TableCell className="px-6 font-semibold text-slate-700">
-                          {format(new Date(record.date + 'T00:00:00'), 'dd/MM/yyyy')}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            <div className="text-xs font-bold text-green-600 flex items-center gap-1">
-                              <span className="w-4 h-4 rounded bg-green-50 flex items-center justify-center text-[8px]">E</span>
-                              {record.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : '--:--'}
+                    {attendance?.map((record) => {
+                      const shift = shifts?.find(s => s.id === record.shiftId);
+                      return (
+                        <TableRow key={record.id} className="hover:bg-slate-50/30 transition-colors border-slate-50">
+                          <TableCell className="px-6">
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-slate-700">
+                                {format(new Date(record.date + 'T00:00:00'), 'dd/MM/yyyy')}
+                              </span>
+                              <span className="text-[10px] text-primary font-bold uppercase">
+                                {shift?.name || 'Desconocida'}
+                              </span>
                             </div>
-                            <div className="text-xs font-bold text-orange-600 flex items-center gap-1">
-                              <span className="w-4 h-4 rounded bg-orange-50 flex items-center justify-center text-[8px]">S</span>
-                              {record.exitDateTime ? format(new Date(record.exitDateTime), 'HH:mm') : '--:--'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <div className="text-xs font-bold text-green-600 flex items-center gap-1">
+                                <span className="w-4 h-4 rounded bg-green-50 flex items-center justify-center text-[8px]">E</span>
+                                {record.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : '--:--'}
+                              </div>
+                              <div className="text-xs font-bold text-orange-600 flex items-center gap-1">
+                                <span className="w-4 h-4 rounded bg-orange-50 flex items-center justify-center text-[8px]">S</span>
+                                {record.exitDateTime ? format(new Date(record.exitDateTime), 'HH:mm') : '--:--'}
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-tighter">
-                            {record.entryMethod === 'qr' ? <QrCode className="h-2 w-2 mr-1" /> : <UserCog className="h-2 w-2 mr-1" />}
-                            {record.entryMethod === 'qr' ? 'QR SCAN' : 'MANUAL'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right px-6">
-                           {record.exitDateTime ? (
-                             <Badge className="bg-green-500 hover:bg-green-600 text-[10px] font-bold">CUMPLIDO</Badge>
-                           ) : (
-                             <Badge variant="secondary" className="text-[10px] font-bold">PROCESO</Badge>
-                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-tighter">
+                              {record.entryMethod === 'qr' ? <QrCode className="h-2 w-2 mr-1" /> : <UserCog className="h-2 w-2 mr-1" />}
+                              {record.entryMethod === 'qr' ? 'QR SCAN' : 'MANUAL'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                             {record.exitDateTime ? (
+                               <Badge className="bg-green-500 hover:bg-green-600 text-[10px] font-bold">CUMPLIDO</Badge>
+                             ) : (
+                               <Badge variant="secondary" className="text-[10px] font-bold">PROCESO</Badge>
+                             )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {(!attendance || attendance.length === 0) && !isAttendanceLoading && (
                       <TableRow>
                         <TableCell colSpan={4} className="text-center py-24 text-muted-foreground italic">
