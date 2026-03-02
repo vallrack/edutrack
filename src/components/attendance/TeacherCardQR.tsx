@@ -4,7 +4,7 @@
 import { QRCodeSVG } from "qrcode.react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, GraduationCap, MapPin, Hash, BookOpen, DoorOpen } from "lucide-react";
+import { GraduationCap, MapPin, Hash, DoorOpen } from "lucide-react";
 
 interface TeacherCardQRProps {
   teacher: any;
@@ -38,7 +38,7 @@ export function TeacherCardQR({ teacher, shifts }: TeacherCardQRProps) {
           < GraduationCap className="h-6 w-6" />
           Carnet Docente
         </CardTitle>
-        <p className="text-primary-foreground/70 text-[10px] font-bold uppercase mt-1">Identificación Institucional</p>
+        <div className="text-primary-foreground/70 text-[10px] font-bold uppercase mt-1">Identificación Institucional</div>
       </CardHeader>
       
       <CardContent className="pt-16 pb-6 px-6 space-y-4">
@@ -46,37 +46,37 @@ export function TeacherCardQR({ teacher, shifts }: TeacherCardQRProps) {
           <h3 className="text-xl font-black text-slate-800 uppercase leading-none">
             {teacher.firstName} {teacher.lastName}
           </h3>
-          <p className="text-primary font-bold text-xs uppercase tracking-widest">{teacher.specialty || 'Docente de Planta'}</p>
+          <div className="text-primary font-bold text-xs uppercase tracking-widest">{teacher.specialty || 'Docente de Planta'}</div>
         </div>
 
         <div className="grid grid-cols-2 gap-3 pt-2">
           <div className="space-y-1">
-            <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1">
+            <div className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1">
               <Hash className="h-2.5 w-2.5" /> Cédula
-            </p>
-            <p className="text-xs font-bold text-slate-700">{teacher.cedula || '---'}</p>
+            </div>
+            <div className="text-xs font-bold text-slate-700">{teacher.cedula || '---'}</div>
           </div>
           <div className="space-y-1 text-right">
-            <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1 justify-end">
+            <div className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1 justify-end">
                Sede <MapPin className="h-2.5 w-2.5" />
-            </p>
-            <p className="text-xs font-bold text-slate-700">{teacher.campus || 'Principal'}</p>
+            </div>
+            <div className="text-xs font-bold text-slate-700">{teacher.campus || 'Principal'}</div>
           </div>
           <div className="space-y-1">
-            <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1">
+            <div className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1">
               <DoorOpen className="h-2.5 w-2.5" /> Salón
-            </p>
-            <p className="text-xs font-bold text-slate-700">{teacher.assignedRoom || 'Por asignar'}</p>
+            </div>
+            <div className="text-xs font-bold text-slate-700">{teacher.assignedRoom || 'Por asignar'}</div>
           </div>
           <div className="space-y-1 text-right">
-             <p className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1 justify-end">
+             <div className="text-[9px] font-black text-slate-400 uppercase flex items-center gap-1 justify-end">
                Estado <Badge className="bg-green-500 h-3 text-[8px] px-1 font-bold">ACTIVO</Badge>
-            </p>
+            </div>
           </div>
         </div>
 
         <div className="pt-4 border-t border-slate-50">
-          <p className="text-[9px] font-black text-slate-400 uppercase mb-2">Jornadas Asignadas</p>
+          <div className="text-[9px] font-black text-slate-400 uppercase mb-2">Jornadas Asignadas</div>
           <div className="flex flex-wrap gap-1">
             {teacherShifts?.map((s: any) => (
               <Badge key={s.id} variant="secondary" className="text-[8px] font-bold bg-slate-50">
