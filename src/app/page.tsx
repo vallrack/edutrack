@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn, ShieldAlert, Loader2, Settings, UserPlus } from "lucide-react";
+import { LogIn, ShieldAlert, Loader2, Settings, UserPlus, QrCode } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -133,12 +133,21 @@ export default function LoginPage() {
               <div className="relative flex justify-center text-[10px] font-black uppercase"><span className="bg-white px-2 text-slate-300 tracking-widest">O</span></div>
             </div>
 
-            <Link href="/register">
-              <Button variant="outline" className="w-full gap-2 h-12 border-primary/20 text-primary hover:bg-primary/5 font-bold rounded-xl" disabled={loading}>
-                <UserPlus className="h-4 w-4" />
-                Registrarme como Docente
-              </Button>
-            </Link>
+            <div className="grid grid-cols-1 gap-3">
+              <Link href="/public-scan">
+                <Button className="w-full gap-2 h-14 bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 border font-black uppercase tracking-widest rounded-xl">
+                  <QrCode className="h-5 w-5" />
+                  Escanear mi Carnet
+                </Button>
+              </Link>
+
+              <Link href="/register">
+                <Button variant="outline" className="w-full gap-2 h-12 border-primary/20 text-primary hover:bg-primary/5 font-bold rounded-xl" disabled={loading}>
+                  <UserPlus className="h-4 w-4" />
+                  Registrarme como Docente
+                </Button>
+              </Link>
+            </div>
 
             <div className="flex flex-col gap-2">
               <Button variant="ghost" className="w-full gap-2 text-[10px] font-black text-muted-foreground uppercase tracking-wider h-10" onClick={handleGuestLogin} disabled={loading}>
