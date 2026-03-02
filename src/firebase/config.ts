@@ -1,8 +1,9 @@
 export const firebaseConfig = {
-  "projectId": "studio-2412732886-6c5e0",
-  "appId": "1:392014763475:web:eafe491fc1801c8005cb26",
-  "apiKey": "AIzaSyD5sMWswoBwiAI30-fNV8BE_DqT4OqxFw0",
-  "authDomain": "studio-2412732886-6c5e0.firebaseapp.com",
-  "measurementId": "",
-  "messagingSenderId": "392014763475"
+  apiKey: "AIzaSyBQMBwwUjdAyWhG6YfcX3YbFE5hHKB6Vwk",
+  authDomain: "schedulecontrol-f8b77.firebaseapp.com",
+  projectId: "schedulecontrol-f8b77",
+  storageBucket: "schedulecontrol-f8b77.firebasestorage.app",
+  messagingSenderId: "206601363305",
+  appId: "1:206601363305:web:f8c621d2bf720daf2fa7f8",
+  measurementId: "G-RL9N1CV9D4"
 };
