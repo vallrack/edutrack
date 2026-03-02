@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, History, UserPlus, Pencil, Trash2, CheckCircle2, Clock } from "lucide-react";
+import { Search, Loader2, History, UserPlus, Pencil, Trash2, CheckCircle2, QrCode, User } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +28,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { TeacherCardQR } from "@/components/attendance/TeacherCardQR";
 
 const DAY_INITIALS = ["D", "L", "M", "M", "J", "V", "S"];
 
@@ -54,7 +62,8 @@ export default function TeachersAdminPage() {
     if (!teachers) return [];
     return teachers.filter(t => 
       `${t.firstName} ${t.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-      t.email.toLowerCase().includes(search.toLowerCase())
+      t.email?.toLowerCase().includes(search.toLowerCase()) ||
+      t.cedula?.includes(search)
     );
   }, [teachers, search]);
 
@@ -68,11 +77,10 @@ export default function TeachersAdminPage() {
       await deleteDoc(doc(firestore, 'userProfiles', id));
       toast({ title: "Docente eliminado", description: "El perfil ha sido removido del sistema." });
     } catch (error: any) {
-      console.error(error);
       toast({ 
         variant: "destructive", 
         title: "Error al eliminar", 
-        description: "No tienes permisos suficientes o el docente ya no existe." 
+        description: "No tienes permisos suficientes." 
       });
     }
   };
@@ -111,7 +119,7 @@ export default function TeachersAdminPage() {
       }
       toast({
         title: "Jornada Registrada",
-        description: `Se registró ${shift.name} para ${teacher.firstName}.`
+        description: `Se registró jornada completa para ${teacher.firstName}.`
       });
     } catch (error) {
       toast({ variant: "destructive", title: "Error" });
@@ -131,20 +139,20 @@ export default function TeachersAdminPage() {
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight">Directorio de Docentes</h1>
-            <p className="text-muted-foreground">Gestión de personal y validación de jornadas.</p>
+            <p className="text-muted-foreground">Gestión de personal, carnets y validación de jornadas.</p>
           </div>
           <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="relative flex-1 md:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input 
-                  placeholder="Buscar docente..." 
-                  className="pl-9 bg-white border-none shadow-sm h-11 w-full rounded-md text-sm outline-none px-4"
+                  placeholder="Buscar por nombre, correo o cédula..." 
+                  className="pl-9 bg-white border-none shadow-sm h-11 w-full rounded-xl text-sm outline-none px-4"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
               />
             </div>
             <Link href="/dashboard/admin/teachers/add">
-              <Button className="h-11 gap-2 font-bold shadow-lg">
+              <Button className="h-11 gap-2 font-bold shadow-lg rounded-xl">
                 <UserPlus className="h-4 w-4" />
                 Nuevo Docente
               </Button>
@@ -152,7 +160,7 @@ export default function TeachersAdminPage() {
           </div>
         </header>
 
-        <Card className="border-none shadow-xl rounded-2xl overflow-hidden">
+        <Card className="border-none shadow-xl rounded-3xl overflow-hidden">
           <CardContent className="p-0">
             {isLoading ? (
               <div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
@@ -160,35 +168,40 @@ export default function TeachersAdminPage() {
               <Table>
                 <TableHeader className="bg-slate-50/50">
                   <TableRow>
-                    <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px]">Nombre</TableHead>
-                    <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px]">Jornadas Asignadas</TableHead>
-                    <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] text-center">Acción de Marcaje</TableHead>
-                    <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] text-right">Gestión</TableHead>
+                    <TableHead className="py-5 px-8 font-black text-slate-400 uppercase text-[10px] tracking-widest">Información Docente</TableHead>
+                    <TableHead className="py-5 px-8 font-black text-slate-400 uppercase text-[10px] tracking-widest">Jornadas Asignadas</TableHead>
+                    <TableHead className="py-5 px-8 font-black text-slate-400 uppercase text-[10px] tracking-widest text-center">Marcaje Rápido</TableHead>
+                    <TableHead className="py-5 px-8 font-black text-slate-400 uppercase text-[10px] tracking-widest text-right">Gestión</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredTeachers.map((teacher) => (
                     <TableRow key={teacher.id} className="hover:bg-slate-50/50 border-slate-50">
-                      <TableCell className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold uppercase">
-                            {teacher.firstName[0]}{teacher.lastName[0]}
+                      <TableCell className="py-5 px-8">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary text-sm font-black uppercase">
+                            {teacher.firstName?.[0]}{teacher.lastName?.[0]}
                           </div>
                           <div className="flex flex-col">
-                            <span className="font-semibold text-slate-700">{teacher.firstName} {teacher.lastName}</span>
-                            <span className="text-[10px] text-muted-foreground">{teacher.email}</span>
+                            <span className="font-bold text-slate-800 uppercase tracking-tight">{teacher.firstName} {teacher.lastName}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-muted-foreground font-medium">{teacher.email}</span>
+                              <Badge variant="outline" className="text-[8px] font-black uppercase h-4 px-1 border-primary/20 text-primary">
+                                ID: {teacher.cedula || '---'}
+                              </Badge>
+                            </div>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="py-4 px-6">
+                      <TableCell className="py-5 px-8">
                         <div className="flex flex-col gap-2">
                           {teacher.shiftIds?.map((sid: string) => {
                             const s = shifts?.find(x => x.id === sid);
                             return s ? (
-                              <div key={sid} className="flex flex-col gap-0.5 border-l-2 border-primary/20 pl-2">
-                                <span className="text-[10px] font-bold text-slate-700">{s.name}</span>
+                              <div key={sid} className="flex flex-col gap-0.5 border-l-2 border-primary/20 pl-3">
+                                <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">{s.name}</span>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-[9px] text-primary font-bold">{s.startTime}-{s.endTime}</span>
+                                  <span className="text-[9px] text-primary font-black">{s.startTime}-{s.endTime}</span>
                                   <div className="flex gap-0.5">
                                     {DAY_INITIALS.map((init, i) => (
                                       <span key={i} className={`text-[8px] font-black ${s.days?.includes(i) ? 'text-primary' : 'text-slate-200'}`}>
@@ -200,58 +213,82 @@ export default function TeachersAdminPage() {
                               </div>
                             ) : null;
                           })}
+                          {(!teacher.shiftIds || teacher.shiftIds.length === 0) && (
+                            <span className="text-[10px] text-muted-foreground italic">Sin jornadas</span>
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell className="py-4 px-6 text-center">
+                      <TableCell className="py-5 px-8 text-center">
                         <Popover>
                           <PopoverTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 gap-2 text-primary font-bold">
-                              <CheckCircle2 className="h-4 w-4" /> Marcar Jornada
+                            <Button variant="ghost" size="sm" className="h-9 gap-2 text-primary font-black uppercase text-[10px] rounded-xl hover:bg-primary/5">
+                              <CheckCircle2 className="h-4 w-4" /> Validar Turno
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-64 p-2 space-y-1">
-                            <p className="text-[10px] font-black uppercase text-slate-400 px-2 py-1">Selecciona Jornada</p>
-                            {teacher.shiftIds?.map((sid: string) => {
-                              const s = shifts?.find(x => x.id === sid);
-                              return s ? (
-                                <Button 
-                                  key={sid} 
-                                  variant="ghost" 
-                                  className="w-full justify-between h-11 px-2 text-[11px]"
-                                  onClick={() => handleManualShiftMark(teacher, sid)}
-                                >
-                                  <div className="text-left">
-                                    <p className="font-bold">{s.name}</p>
-                                    <p className="text-[9px] text-muted-foreground">{s.startTime}-{s.endTime}</p>
-                                  </div>
-                                  <CheckCircle2 className="h-4 w-4 opacity-20" />
-                                </Button>
-                              ) : null;
-                            })}
+                          <PopoverContent className="w-64 p-3 rounded-2xl shadow-2xl border-none">
+                            <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Seleccionar Jornada</p>
+                            <div className="space-y-1">
+                              {teacher.shiftIds?.map((sid: string) => {
+                                const s = shifts?.find(x => x.id === sid);
+                                return s ? (
+                                  <Button 
+                                    key={sid} 
+                                    variant="ghost" 
+                                    className="w-full justify-between h-12 px-3 text-[11px] rounded-xl hover:bg-slate-50"
+                                    onClick={() => handleManualShiftMark(teacher, sid)}
+                                  >
+                                    <div className="text-left">
+                                      <p className="font-black text-slate-700 uppercase">{s.name}</p>
+                                      <p className="text-[9px] text-muted-foreground">{s.startTime} - {s.endTime}</p>
+                                    </div>
+                                    <CheckCircle2 className="h-4 w-4 text-green-500 opacity-40" />
+                                  </Button>
+                                ) : null;
+                              })}
+                            </div>
                           </PopoverContent>
                         </Popover>
                       </TableCell>
-                      <TableCell className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      <TableCell className="py-5 px-8 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 text-blue-500 hover:bg-blue-50 rounded-xl" title="Ver Carnet">
+                                <QrCode className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md border-none bg-transparent shadow-none p-0">
+                               <TeacherCardQR teacher={teacher} shifts={shifts || []} />
+                            </DialogContent>
+                          </Dialog>
+                          
                           <Link href={`/dashboard/records?userId=${teacher.id}`}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8"><History className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:bg-slate-50 rounded-xl" title="Historial">
+                              <History className="h-4 w-4" />
+                            </Button>
                           </Link>
+                          
                           <Link href={`/dashboard/admin/teachers/edit/${teacher.id}`}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8"><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-400 hover:bg-slate-50 rounded-xl" title="Editar">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
                           </Link>
+                          
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:bg-destructive/5 rounded-xl" title="Eliminar">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent>
+                            <AlertDialogContent className="rounded-3xl border-none">
                               <AlertDialogHeader>
-                                <AlertDialogTitle>¿Eliminar docente?</AlertDialogTitle>
-                                <AlertDialogDescription>Esta acción no se puede deshacer y borrará permanentemente el perfil del docente.</AlertDialogDescription>
+                                <AlertDialogTitle className="font-black uppercase tracking-tight">¿Eliminar docente?</AlertDialogTitle>
+                                <AlertDialogDescription>Esta acción borrará permanentemente el perfil de {teacher.firstName} {teacher.lastName} y sus registros históricos.</AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                  Confirmar Eliminación
+                                <AlertDialogCancel className="rounded-xl font-bold">Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl font-bold">
+                                  Confirmar
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -260,10 +297,13 @@ export default function TeachersAdminPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                  {(!filteredTeachers || filteredTeachers.length === 0) && !isLoading && (
+                  {filteredTeachers.length === 0 && !isLoading && (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-20 text-muted-foreground italic">
-                        No se encontraron docentes para mostrar.
+                      <TableCell colSpan={4} className="text-center py-24">
+                         <div className="flex flex-col items-center gap-2">
+                           <User className="h-12 w-12 text-slate-100" />
+                           <p className="text-sm font-bold text-slate-300 uppercase tracking-widest italic">Sin resultados</p>
+                         </div>
                       </TableCell>
                     </TableRow>
                   )}
