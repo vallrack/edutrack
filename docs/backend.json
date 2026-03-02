@@ -4,13 +4,17 @@
     "UserProfile": {
       "title": "UserProfile",
       "type": "object",
-      "description": "Perfil del usuario con su rol y jornadas asignadas.",
+      "description": "Perfil del usuario con su rol, jornadas y datos institucionales.",
       "properties": {
         "id": { "type": "string" },
         "firebaseAuthUid": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "firstName": { "type": "string" },
         "lastName": { "type": "string" },
+        "cedula": { "type": "string", "description": "Documento de identidad" },
+        "specialty": { "type": "string", "description": "Especialidad o curso que enseña" },
+        "assignedRoom": { "type": "string", "description": "Salón o sala asignada" },
+        "campus": { "type": "string", "description": "Sede institucional" },
         "role": { "type": "string", "enum": ["admin", "coordinator", "teacher"] },
         "shiftIds": { 
           "type": "array", 
@@ -20,7 +24,7 @@
         "isActive": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "email", "firstName", "lastName", "role"]
+      "required": ["id", "email", "firstName", "lastName", "role", "cedula"]
     },
     "Shift": {
       "title": "Shift",
@@ -28,13 +32,13 @@
       "description": "Define un horario o jornada laboral con días específicos.",
       "properties": {
         "id": { "type": "string" },
-        "name": { "type": "string", "description": "Nombre de la jornada (Ej: Turno Mañana)" },
+        "name": { "type": "string", "description": "Nombre de la jornada" },
         "startTime": { "type": "string", "description": "Hora de entrada (HH:mm)" },
         "endTime": { "type": "string", "description": "Hora de salida (HH:mm)" },
-        "tolerance": { "type": "number", "description": "Minutos de tolerancia para la entrada" },
+        "tolerance": { "type": "number", "description": "Minutos de tolerancia" },
         "days": {
           "type": "array",
-          "items": { "type": "number", "description": "0=Domingo, 1=Lunes, ..., 6=Sábado" }
+          "items": { "type": "number", "description": "0=Dom, 1=Lun, ..., 6=Sáb" }
         }
       },
       "required": ["id", "name", "startTime", "endTime", "days"]
@@ -56,7 +60,7 @@
         "path": "/userProfiles/{uid}",
         "definition": {
           "entityName": "UserProfile",
-          "description": "Perfiles de usuario."
+          "description": "Perfiles de usuario con datos institucionales."
         }
       }
     ]

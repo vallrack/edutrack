@@ -10,12 +10,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { GraduationCap, ArrowLeft, Loader2, UserPlus, Clock } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { GraduationCap, ArrowLeft, Loader2, UserPlus, Clock, Hash, BookOpen, DoorOpen, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function RegisterPage() {
   const { auth, firestore } = useFirebase();
@@ -26,6 +25,10 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [cedula, setCedula] = useState("");
+  const [specialty, setSpecialty] = useState("");
+  const [assignedRoom, setAssignedRoom] = useState("");
+  const [campus, setCampus] = useState("");
   const [selectedShiftIds, setSelectedShiftIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -42,18 +45,20 @@ export default function RegisterPage() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!cedula) {
+      toast({ variant: "destructive", title: "Cédula requerida" });
+      return;
+    }
     if (selectedShiftIds.length === 0) {
-      toast({ variant: "destructive", title: "Horario requerido", description: "Seleccione al menos una jornada de trabajo." });
+      toast({ variant: "destructive", title: "Horario requerido", description: "Seleccione al menos una jornada." });
       return;
     }
 
     setLoading(true);
     try {
-      // 1. Create Auth User
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const uid = userCredential.user.uid;
 
-      // 2. Create Profile in Firestore
       const profileRef = doc(firestore, "userProfiles", uid);
       const profileData = {
         id: uid,
@@ -61,6 +66,10 @@ export default function RegisterPage() {
         email,
         firstName,
         lastName,
+        cedula,
+        specialty,
+        assignedRoom,
+        campus,
         role: "teacher",
         shiftIds: selectedShiftIds,
         isActive: true,
@@ -72,7 +81,7 @@ export default function RegisterPage() {
 
       toast({ 
         title: "Registro Exitoso", 
-        description: "Su cuenta de docente ha sido creada. ¡Bienvenido!" 
+        description: "Su cuenta ha sido creada. ¡Bienvenido!" 
       });
       
       router.push("/dashboard");
@@ -88,53 +97,90 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50">
-      <div className="max-w-xl w-full space-y-6">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50 py-12">
+      <div className="max-w-2xl w-full space-y-6">
         <div className="text-center">
-          <div className="inline-flex p-3 bg-primary rounded-xl mb-4 shadow-lg shadow-primary/20">
+          <div className="inline-flex p-3 bg-primary rounded-2xl mb-4 shadow-xl shadow-primary/20">
             <GraduationCap className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Registro de Docente</h1>
-          <p className="text-muted-foreground text-sm">Crea tu perfil y selecciona tus jornadas laborales</p>
+          <h1 className="text-3xl font-black tracking-tight text-slate-900">Registro Institucional</h1>
+          <p className="text-muted-foreground text-sm font-medium">Complete su perfil para generar su carnet digital</p>
         </div>
 
-        <Card className="border-none shadow-2xl overflow-hidden">
+        <Card className="border-none shadow-2xl overflow-hidden rounded-3xl">
           <form onSubmit={handleRegister}>
-            <CardHeader className="bg-white border-b border-slate-50">
-              <CardTitle className="text-lg">Datos Personales</CardTitle>
-              <CardDescription>Información básica para el control de asistencia</CardDescription>
+            <CardHeader className="bg-white border-b border-slate-50 p-8">
+              <CardTitle className="text-lg font-black uppercase text-primary tracking-widest flex items-center gap-2">
+                <UserPlus className="h-5 w-5" /> Datos del Docente
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-8 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+            <CardContent className="p-8 space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">Nombre(s)</Label>
-                  <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} required placeholder="Ej: Maria" />
+                  <Label className="text-[10px] font-black uppercase text-slate-400">Nombre(s)</Label>
+                  <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} required placeholder="Ej: María" className="h-11 bg-slate-50 border-none shadow-inner" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Apellido(s)</Label>
-                  <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} required placeholder="Ej: García" />
+                  <Label className="text-[10px] font-black uppercase text-slate-400">Apellido(s)</Label>
+                  <Input value={lastName} onChange={(e) => setLastName(e.target.value)} required placeholder="Ej: García" className="h-11 bg-slate-50 border-none shadow-inner" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1">
+                    <Hash className="h-3 w-3" /> Cédula / ID
+                  </Label>
+                  <Input value={cedula} onChange={(e) => setCedula(e.target.value)} required placeholder="Documento identidad" className="h-11 bg-slate-50 border-none shadow-inner" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1">
+                    <BookOpen className="h-3 w-3" /> Especialidad
+                  </Label>
+                  <Input value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ej: Matemáticas" className="h-11 bg-slate-50 border-none shadow-inner" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1">
+                    <DoorOpen className="h-3 w-3" /> Salón Asignado
+                  </Label>
+                  <Input value={assignedRoom} onChange={(e) => setAssignedRoom(e.target.value)} placeholder="Ej: Aula 102" className="h-11 bg-slate-50 border-none shadow-inner" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> Sede
+                  </Label>
+                  <Select onValueChange={setCampus}>
+                    <SelectTrigger className="h-11 bg-slate-50 border-none shadow-inner">
+                      <SelectValue placeholder="Seleccione Sede" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Principal">Sede Principal</SelectItem>
+                      <SelectItem value="Norte">Sede Norte</SelectItem>
+                      <SelectItem value="Sur">Sede Sur</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Correo Institucional</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="docente@institucion.com" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña (mín. 6 caracteres)</Label>
-                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-400">Correo Institucional</Label>
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="docente@institucion.com" className="h-11 bg-slate-50 border-none shadow-inner" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-slate-400">Contraseña</Label>
+                  <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="h-11 bg-slate-50 border-none shadow-inner" />
+                </div>
               </div>
 
               <div className="space-y-4 pt-4">
-                <Label className="text-sm font-bold text-slate-700">Asignación de Jornadas</Label>
-                <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
+                <Label className="text-sm font-black text-slate-700 uppercase tracking-tight">Asignación de Jornadas</Label>
+                <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2">
                   {isLoadingShifts ? (
                     <div className="flex items-center gap-2 py-4 justify-center text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" /> Cargando horarios disponibles...
+                      <Loader2 className="h-4 w-4 animate-spin" /> Cargando horarios...
                     </div>
                   ) : shifts?.map(shift => (
                     <div 
                       key={shift.id} 
-                      className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                      className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${
                         selectedShiftIds.includes(shift.id) 
                           ? 'bg-primary/5 border-primary shadow-sm' 
                           : 'bg-slate-50 border-transparent hover:border-slate-200'
@@ -147,33 +193,25 @@ export default function RegisterPage() {
                           onCheckedChange={() => toggleShift(shift.id)}
                         />
                         <Label htmlFor={`reg-shift-${shift.id}`} className="cursor-pointer">
-                          <p className="text-sm font-bold text-slate-800">{shift.name}</p>
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-medium">
+                          <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{shift.name}</p>
+                          <div className="flex items-center gap-1 text-[10px] text-primary font-black uppercase">
                             <Clock className="h-2.5 w-2.5" />
                             {shift.startTime} - {shift.endTime}
                           </div>
                         </Label>
                       </div>
-                      <div className="text-[10px] bg-white px-2 py-1 rounded-md border text-muted-foreground font-bold">
-                        {shift.tolerance}m Tol.
-                      </div>
                     </div>
                   ))}
-                  {(!shifts || shifts.length === 0) && !isLoadingShifts && (
-                    <p className="text-xs text-orange-500 bg-orange-50 p-4 rounded-xl text-center">
-                      No hay jornadas configuradas por la institución.
-                    </p>
-                  )}
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="bg-slate-50 p-6 flex flex-col gap-4">
-              <Button type="submit" className="w-full h-12 gap-2 font-bold shadow-lg" disabled={loading}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                Crear mi Cuenta de Docente
+            <CardFooter className="bg-slate-50 p-8 flex flex-col gap-6">
+              <Button type="submit" className="w-full h-14 gap-2 font-black uppercase tracking-widest shadow-xl" disabled={loading}>
+                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <UserPlus className="h-5 w-5" />}
+                Completar Registro
               </Button>
-              <Link href="/" className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1">
-                <ArrowLeft className="h-3 w-3" /> Ya tengo cuenta, ir al login
+              <Link href="/" className="text-xs font-bold text-muted-foreground hover:text-primary flex items-center gap-2 transition-colors">
+                <ArrowLeft className="h-4 w-4" /> Volver al Inicio
               </Link>
             </CardFooter>
           </form>

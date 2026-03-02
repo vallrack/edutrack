@@ -7,13 +7,18 @@ export interface User {
   email: string;
   role: UserRole;
   avatarUrl?: string;
+  cedula?: string;
+  specialty?: string;
+  assignedRoom?: string;
+  campus?: string;
+  shiftIds?: string[];
 }
 
 export interface AttendanceRecord {
   id: string;
   userId: string;
   userName: string;
-  shiftId?: string; // ID de la jornada específica
+  shiftId?: string;
   date: string;
   time: string;
   entryDateTime?: string;
@@ -27,11 +32,4 @@ export interface AttendanceRecord {
     latitude: number;
     longitude: number;
   };
-}
-
-export interface TeacherStats {
-  teacherId: string;
-  teacherName: string;
-  totalHours: number;
-  records: AttendanceRecord[];
 }

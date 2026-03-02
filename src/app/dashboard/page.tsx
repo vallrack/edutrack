@@ -5,17 +5,18 @@ import { useFirebase, useCollection, useDoc, useMemoFirebase } from "@/firebase"
 import { Navbar } from "@/components/layout/Navbar";
 import { AttendanceStats } from "@/components/dashboard/AttendanceStats";
 import { QRMarker } from "@/components/attendance/QRMarker";
+import { TeacherCardQR } from "@/components/attendance/TeacherCardQR";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { QrCode, UserCog, Loader2, CheckCircle2, MapPin, Sparkles, Clock, Calendar } from "lucide-react";
-import { AdminAttendanceSummary } from "@/components/admin/AdminAttendanceSummary";
+import { QrCode, UserCog, Loader2, Sparkles, Clock, Calendar, Smartphone } from "lucide-react";
 import { collection, doc, addDoc, serverTimestamp, query, orderBy, limit, setDoc, getDocs, where } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -159,11 +160,10 @@ export default function DashboardPage() {
     );
   }
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'coordinator';
-  const todayRecords = attendance?.filter(r => r.date === format(new Date(), 'yyyy-MM-dd')) || [];
-  const currentDayOfWeek = new Date().getDay(); // 0=Domingo, 1=Lunes...
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayRecords = attendance?.filter(r => r.date === todayStr) || [];
+  const currentDayOfWeek = new Date().getDay();
 
-  // Filtrar jornadas que corresponden al día de hoy
   const todayShifts = profile?.shiftIds?.map((sid: string) => shifts?.find(s => s.id === sid)).filter(s => s && s.days?.includes(currentDayOfWeek)) || [];
 
   return (
@@ -184,7 +184,7 @@ export default function DashboardPage() {
             <p className="text-muted-foreground">Bienvenido, {profile?.firstName}. Hoy es {format(new Date(), 'eeee, dd MMMM')}</p>
           </div>
           <Badge variant="secondary" className="w-fit h-fit px-4 py-1 text-sm bg-white shadow-sm text-green-600 border-green-100 font-bold">
-            Sistema en Línea
+            {profile?.campus || 'Sede Central'}
           </Badge>
         </header>
 
@@ -192,110 +192,111 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-4 space-y-6">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Jornadas Disponibles para Hoy</h2>
-            
-            {todayShifts.map((shift: any) => {
-              const record = todayRecords.find(r => r.shiftId === shift.id);
-              return (
-                <Card key={shift.id} className="border-none shadow-xl bg-white rounded-2xl overflow-hidden">
-                  <CardHeader className="bg-slate-50/50 pb-4">
-                    <CardTitle className="text-md flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-primary" />
-                        {shift.name}
-                      </div>
-                      <Badge variant="outline" className="text-[10px] font-bold">
-                        {shift.startTime} - {shift.endTime}
-                      </Badge>
-                    </CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                       <Badge className="bg-primary/10 text-primary text-[8px] border-none">TOLERANCIA: {shift.tolerance}m</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-6 space-y-4">
-                    <Button 
-                      onClick={() => handleFullShiftMark(shift.id)}
-                      disabled={!!isActionLoading || (!!record?.entryDateTime && !!record?.exitDateTime)}
-                      className="w-full h-12 bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 border flex items-center justify-between px-4 font-black rounded-xl text-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" />
-                        <span>REGISTRAR CUMPLIMIENTO TOTAL</span>
-                      </div>
-                      {isActionLoading === shift.id && <Loader2 className="h-3 w-3 animate-spin" />}
-                    </Button>
+            <Tabs defaultValue="marking" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 bg-white shadow-sm h-12 rounded-xl">
+                <TabsTrigger value="marking" className="font-bold rounded-lg flex gap-2">
+                  <Clock className="h-4 w-4" /> Marcaje
+                </TabsTrigger>
+                <TabsTrigger value="id" className="font-bold rounded-lg flex gap-2">
+                  <Smartphone className="h-4 w-4" /> Carnet
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="marking" className="space-y-6 mt-6">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Jornadas Hoy</h2>
+                {todayShifts.map((shift: any) => {
+                  const record = todayRecords.find(r => r.shiftId === shift.id);
+                  return (
+                    <Card key={shift.id} className="border-none shadow-xl bg-white rounded-2xl overflow-hidden">
+                      <CardHeader className="bg-slate-50/50 pb-4">
+                        <CardTitle className="text-md flex items-center justify-between">
+                          <div className="flex items-center gap-2 font-black">
+                            <Clock className="h-4 w-4 text-primary" />
+                            {shift.name}
+                          </div>
+                          <Badge variant="outline" className="text-[10px] font-bold">
+                            {shift.startTime} - {shift.endTime}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-6 space-y-4">
+                        <Button 
+                          onClick={() => handleFullShiftMark(shift.id)}
+                          disabled={!!isActionLoading || (!!record?.entryDateTime && !!record?.exitDateTime)}
+                          className="w-full h-12 bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 border flex items-center justify-between px-4 font-black rounded-xl text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="h-4 w-4" />
+                            <span>CUMPLIMIENTO TOTAL</span>
+                          </div>
+                          {isActionLoading === shift.id && <Loader2 className="h-3 w-3 animate-spin" />}
+                        </Button>
 
-                    <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <Checkbox 
-                        id={`entry-${shift.id}`} 
-                        disabled={!!record?.entryDateTime || !!isActionLoading}
-                        checked={!!record?.entryDateTime}
-                        onCheckedChange={(checked) => checked && handleMarkAttendance(shift.id, 'entry', 'manual')}
-                      />
-                      <Label htmlFor={`entry-${shift.id}`} className="flex-1 cursor-pointer">
-                        <p className="font-bold text-slate-800 text-sm">Entrada Manual</p>
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold">
-                          {record?.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : 'Pendiente'}
-                        </p>
-                      </Label>
-                    </div>
+                        <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                          <Checkbox 
+                            id={`entry-${shift.id}`} 
+                            disabled={!!record?.entryDateTime || !!isActionLoading}
+                            checked={!!record?.entryDateTime}
+                            onCheckedChange={(checked) => checked && handleMarkAttendance(shift.id, 'entry', 'manual')}
+                          />
+                          <Label htmlFor={`entry-${shift.id}`} className="flex-1 cursor-pointer">
+                            <p className="font-bold text-slate-800 text-sm">Entrada Manual</p>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold">
+                              {record?.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : 'Pendiente'}
+                            </p>
+                          </Label>
+                        </div>
 
-                    <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                      <Checkbox 
-                        id={`exit-${shift.id}`} 
-                        disabled={!record?.entryDateTime || !!record?.exitDateTime || !!isActionLoading}
-                        checked={!!record?.exitDateTime}
-                        onCheckedChange={(checked) => checked && handleMarkAttendance(shift.id, 'exit', 'manual')}
-                      />
-                      <Label htmlFor={`exit-${shift.id}`} className="flex-1 cursor-pointer">
-                        <p className="font-bold text-slate-800 text-sm">Salida Manual</p>
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold">
-                          {record?.exitDateTime ? format(new Date(record.exitDateTime), 'HH:mm') : 'Pendiente'}
-                        </p>
-                      </Label>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                        <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                          <Checkbox 
+                            id={`exit-${shift.id}`} 
+                            disabled={!record?.entryDateTime || !!record?.exitDateTime || !!isActionLoading}
+                            checked={!!record?.exitDateTime}
+                            onCheckedChange={(checked) => checked && handleMarkAttendance(shift.id, 'exit', 'manual')}
+                          />
+                          <Label htmlFor={`exit-${shift.id}`} className="flex-1 cursor-pointer">
+                            <p className="font-bold text-slate-800 text-sm">Salida Manual</p>
+                            <p className="text-[10px] text-muted-foreground uppercase font-bold">
+                              {record?.exitDateTime ? format(new Date(record.exitDateTime), 'HH:mm') : 'Pendiente'}
+                            </p>
+                          </Label>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+                {todayShifts.length === 0 && (
+                  <Card className="border-dashed border-2 bg-transparent text-center p-12">
+                    <Calendar className="h-10 w-10 text-slate-300 mx-auto mb-4" />
+                    <p className="text-sm font-medium text-slate-500">No hay jornadas programadas para hoy.</p>
+                  </Card>
+                )}
+                <QRMarker onMark={(type, loc) => {
+                  if (todayShifts.length === 1) {
+                    handleMarkAttendance(todayShifts[0].id, type, 'qr', loc);
+                  } else {
+                    toast({ title: "Selección requerida", description: "Use los controles manuales hoy para seleccionar la jornada." });
+                  }
+                }} />
+              </TabsContent>
 
-            {todayShifts.length === 0 && (
-              <Card className="border-dashed border-2 bg-transparent text-center p-12">
-                <Calendar className="h-10 w-10 text-slate-300 mx-auto mb-4" />
-                <p className="text-sm font-medium text-slate-500">No tienes jornadas programadas para este día de la semana.</p>
-              </Card>
-            )}
-
-            <QRMarker onMark={(type, loc) => {
-              if (todayShifts.length === 1) {
-                handleMarkAttendance(todayShifts[0].id, type, 'qr', loc);
-              } else {
-                toast({ title: "Selección requerida", description: "Usa el marcaje por tarjeta para seleccionar la jornada específica hoy." });
-              }
-            }} />
-
-            {isAdmin && attendance && attendance.length > 0 && (
-              <AdminAttendanceSummary attendance={attendance.map(a => ({
-                id: a.id,
-                userId: user.uid,
-                userName: profile ? `${profile.firstName} ${profile.lastName}` : "Usuario",
-                date: a.date,
-                time: a.entryDateTime ? format(new Date(a.entryDateTime), 'HH:mm') : '---',
-                type: 'entry',
-                method: a.entryMethod || 'manual',
-                location: { latitude: a.entryLocationLatitude || 0, longitude: a.entryLocationLongitude || 0 }
-              }))} />
-            )}
+              <TabsContent value="id" className="mt-6">
+                 <TeacherCardQR teacher={profile} shifts={shifts || []} />
+                 <p className="text-[10px] text-center text-muted-foreground mt-4 font-medium leading-relaxed">
+                   Este carnet es personal e intransferible. <br/> Úselo para validar su ingreso en los puntos de control.
+                 </p>
+              </TabsContent>
+            </Tabs>
           </div>
 
           <div className="lg:col-span-8">
-            <Card className="border-none shadow-xl h-full rounded-2xl overflow-hidden bg-white">
-              <CardHeader className="border-b border-slate-50 flex flex-row items-center justify-between">
+            <Card className="border-none shadow-xl h-full rounded-3xl overflow-hidden bg-white">
+              <CardHeader className="border-b border-slate-50 flex flex-row items-center justify-between py-8 px-8">
                 <div>
-                  <CardTitle>Historial de Movimientos</CardTitle>
-                  <CardDescription>Detalle por jornada y fecha</CardDescription>
+                  <CardTitle className="text-xl font-black">Historial de Movimientos</CardTitle>
+                  <CardDescription>Seguimiento detallado por fecha</CardDescription>
                 </div>
-                <Badge variant="outline" className="font-bold border-primary/20 text-primary">
+                <Badge variant="outline" className="font-black border-primary/20 text-primary rounded-lg px-4 py-1">
                   {attendance?.length || 0} Registros
                 </Badge>
               </CardHeader>
@@ -303,10 +304,10 @@ export default function DashboardPage() {
                 <Table>
                   <TableHeader className="bg-slate-50/50">
                     <TableRow>
-                      <TableHead className="px-6">Fecha / Jornada</TableHead>
-                      <TableHead>Entrada / Salida</TableHead>
-                      <TableHead>Método</TableHead>
-                      <TableHead className="text-right px-6">Estado</TableHead>
+                      <TableHead className="px-8 py-4 uppercase text-[10px] font-black text-slate-400">Fecha / Jornada</TableHead>
+                      <TableHead className="py-4 uppercase text-[10px] font-black text-slate-400">Marcajes</TableHead>
+                      <TableHead className="py-4 uppercase text-[10px] font-black text-slate-400">Método</TableHead>
+                      <TableHead className="text-right px-8 py-4 uppercase text-[10px] font-black text-slate-400">Estado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -314,39 +315,38 @@ export default function DashboardPage() {
                       const shift = shifts?.find(s => s.id === record.shiftId);
                       return (
                         <TableRow key={record.id} className="hover:bg-slate-50/30 transition-colors border-slate-50">
-                          <TableCell className="px-6">
+                          <TableCell className="px-8 py-5">
                             <div className="flex flex-col">
-                              <span className="font-semibold text-slate-700">
+                              <span className="font-bold text-slate-800">
                                 {format(new Date(record.date + 'T00:00:00'), 'dd/MM/yyyy')}
                               </span>
-                              <span className="text-[10px] text-primary font-bold uppercase">
-                                {shift?.name || 'Desconocida'}
+                              <span className="text-[10px] text-primary font-black uppercase tracking-tight">
+                                {shift?.name || '---'}
                               </span>
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-5">
                             <div className="flex flex-col gap-1">
-                              <div className="text-xs font-bold text-green-600 flex items-center gap-1">
-                                <span className="w-4 h-4 rounded bg-green-50 flex items-center justify-center text-[8px]">E</span>
+                              <div className="text-xs font-black text-green-600 flex items-center gap-2">
+                                <span className="w-4 h-4 rounded bg-green-50 flex items-center justify-center text-[8px] border border-green-100">E</span>
                                 {record.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : '--:--'}
                               </div>
-                              <div className="text-xs font-bold text-orange-600 flex items-center gap-1">
-                                <span className="w-4 h-4 rounded bg-orange-50 flex items-center justify-center text-[8px]">S</span>
+                              <div className="text-xs font-black text-orange-600 flex items-center gap-2">
+                                <span className="w-4 h-4 rounded bg-orange-50 flex items-center justify-center text-[8px] border border-orange-100">S</span>
                                 {record.exitDateTime ? format(new Date(record.exitDateTime), 'HH:mm') : '--:--'}
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-tighter">
-                              {record.entryMethod === 'qr' ? <QrCode className="h-2 w-2 mr-1" /> : <UserCog className="h-2 w-2 mr-1" />}
+                          <TableCell className="py-5">
+                            <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-tighter bg-white border">
                               {record.entryMethod === 'qr' ? 'QR SCAN' : 'MANUAL'}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right px-6">
+                          <TableCell className="text-right px-8 py-5">
                              {record.exitDateTime ? (
-                               <Badge className="bg-green-500 hover:bg-green-600 text-[10px] font-bold">CUMPLIDO</Badge>
+                               <Badge className="bg-green-500 hover:bg-green-600 text-[10px] font-bold rounded-lg px-3">CUMPLIDO</Badge>
                              ) : (
-                               <Badge variant="secondary" className="text-[10px] font-bold">PROCESO</Badge>
+                               <Badge variant="secondary" className="text-[10px] font-bold rounded-lg px-3">EN PROCESO</Badge>
                              )}
                           </TableCell>
                         </TableRow>
@@ -355,7 +355,7 @@ export default function DashboardPage() {
                     {(!attendance || attendance.length === 0) && !isAttendanceLoading && (
                       <TableRow>
                         <TableCell colSpan={4} className="text-center py-24 text-muted-foreground italic">
-                          No hay actividad registrada en este periodo.
+                          No hay actividad registrada.
                         </TableCell>
                       </TableRow>
                     )}
