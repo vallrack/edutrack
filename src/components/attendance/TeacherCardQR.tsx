@@ -26,14 +26,8 @@ export function TeacherCardQR({ teacher, shifts }: TeacherCardQRProps) {
     id: teacher.id,
     nombre: `${teacher.firstName} ${teacher.lastName}`,
     cedula: teacher.cedula,
-    especialidad: teacher.specialty,
     salon: teacher.assignedRoom,
-    sede: teacher.campus,
-    jornadas: teacherShifts?.map((s: any) => ({
-      nombre: s.name,
-      horario: `${s.startTime}-${s.endTime}`,
-      dias: s.days
-    }))
+    sede: teacher.campus
   });
 
   return (
@@ -131,11 +125,6 @@ export function TeacherCardQR({ teacher, shifts }: TeacherCardQRProps) {
                 </div>
               </div>
             ))}
-            {(!teacherShifts || teacherShifts.length === 0) && (
-              <div className="text-center py-2">
-                <span className="text-[9px] text-slate-300 italic font-medium uppercase tracking-widest">Sin jornadas registradas</span>
-              </div>
-            )}
           </div>
         </div>
       </CardContent>

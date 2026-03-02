@@ -129,7 +129,6 @@ export default function TeachersAdminPage() {
     }
   };
 
-  // Improved navbar data construction
   const navbarUser = profile ? {
     id: profile.id,
     name: `${profile.firstName} ${profile.lastName}`,
@@ -138,7 +137,7 @@ export default function TeachersAdminPage() {
   } : user ? {
     id: user.uid,
     name: user.displayName || 'Usuario',
-    role: 'admin' as any, // Fallback to admin if we're on this page
+    role: 'admin' as any,
     email: user.email || ''
   } : null;
 
@@ -227,9 +226,6 @@ export default function TeachersAdminPage() {
                                 </div>
                               ) : null;
                             })}
-                            {(!teacher.shiftIds || teacher.shiftIds.length === 0) && (
-                              <span className="text-[9px] md:text-[10px] text-muted-foreground italic">Sin jornadas</span>
-                            )}
                           </div>
                         </TableCell>
                         <TableCell className="py-4 md:py-5 px-6 md:px-8 text-center">
@@ -279,19 +275,16 @@ export default function TeachersAdminPage() {
                                  <TeacherCardQR teacher={teacher} shifts={shifts || []} />
                               </DialogContent>
                             </Dialog>
-                            
                             <Link href={`/dashboard/records?userId=${teacher.id}`}>
                               <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9 text-slate-400 hover:bg-slate-50 rounded-xl" title="Historial">
                                 <History className="h-3.5 w-3.5 md:h-4 md:w-4" />
                               </Button>
                             </Link>
-                            
                             <Link href={`/dashboard/admin/teachers/edit/${teacher.id}`}>
                               <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9 text-slate-400 hover:bg-slate-50 rounded-xl" title="Editar">
                                 <Pencil className="h-3.5 w-3.5 md:h-4 md:w-4" />
                               </Button>
                             </Link>
-                            
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 md:h-9 md:w-9 text-destructive hover:bg-destructive/5 rounded-xl" title="Eliminar">
@@ -315,16 +308,6 @@ export default function TeachersAdminPage() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {filteredTeachers.length === 0 && !isLoading && (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-20 md:py-24">
-                           <div className="flex flex-col items-center gap-2">
-                             <User className="h-10 w-10 md:h-12 md:w-12 text-slate-100" />
-                             <p className="text-[10px] md:text-sm font-bold text-slate-300 uppercase tracking-widest italic">Sin resultados</p>
-                           </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
                   </TableBody>
                 </Table>
               </div>

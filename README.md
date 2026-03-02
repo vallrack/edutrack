@@ -13,25 +13,25 @@ Sistema profesional de control de asistencia y gestión de jornadas para la inst
 
 ## Guía de Despliegue (Git)
 
-Para subir este proyecto a tu repositorio de GitHub, ejecuta los siguientes comandos en tu terminal local:
+Para subir este proyecto a tu repositorio de GitHub, abre tu terminal en la carpeta del proyecto y ejecuta los siguientes comandos:
 
 ```bash
-# Inicializar el repositorio
+# 1. Inicializar el repositorio local
 git init
 
-# Añadir todos los archivos
+# 2. Añadir todos los archivos al seguimiento
 git add .
 
-# Primer commit
+# 3. Crear el primer commit
 git commit -m "first commit - Sistema EduTrack Don Bosco"
 
-# Configurar rama principal
+# 4. Configurar la rama principal como 'main'
 git branch -M main
 
-# Vincular con el repositorio remoto
+# 5. Vincular con tu repositorio remoto en GitHub
 git remote add origin https://github.com/vallrack/edutrack.git
 
-# Subir el proyecto
+# 6. Subir el código a GitHub
 git push -u origin main
 ```
 
