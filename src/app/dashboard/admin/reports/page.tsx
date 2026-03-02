@@ -5,18 +5,23 @@ import { useFirebase, useDoc, useMemoFirebase } from "@/firebase";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileDown, FileText, Table as TableIcon, Download, Filter } from "lucide-react";
-import { format, subDays } from "date-fns";
+import { FileText, Table as TableIcon, Download, Loader2 } from "lucide-react";
+import { format, subDays, differenceInMinutes } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { doc } from "firebase/firestore";
+import { doc, collection, getDocs, query, where } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
+import { useState } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 
 export default function ReportsAdminPage() {
   const { user, firestore, auth } = useFirebase();
   const { toast } = useToast();
   const router = useRouter();
+  const [isExporting, setIsExporting] = useState(false);
 
   // Fetch current user profile for Navbar
   const profileRef = useMemoFirebase(() => 
@@ -29,19 +34,82 @@ export default function ReportsAdminPage() {
     router.push("/");
   };
 
-  const handleExport = (formatType: string) => {
-    toast({
-      title: `Generando Reporte ${formatType}`,
-      description: "Calculando horas laboradas y procesando archivo..."
-    });
+  const generateReportData = async () => {
+    const teachersQuery = query(collection(firestore, 'userProfiles'), where('role', '==', 'teacher'));
+    const teachersSnapshot = await getDocs(teachersQuery);
     
-    // Simulate export logic
-    setTimeout(() => {
-      toast({
-        title: "Descarga Exitosa",
-        description: `El archivo edutrack_report_${format(new Date(), 'yyyyMMdd')}.${formatType.toLowerCase()} ha sido generado.`
+    const reportRows: any[] = [];
+
+    for (const teacherDoc of teachersSnapshot.docs) {
+      const teacherData = teacherDoc.data();
+      const recordsRef = collection(firestore, 'userProfiles', teacherDoc.id, 'attendanceRecords');
+      const recordsSnapshot = await getDocs(recordsRef);
+
+      recordsSnapshot.forEach(recordDoc => {
+        const record = recordDoc.data();
+        let minutesWorked = 0;
+        
+        if (record.entryDateTime && record.exitDateTime) {
+          minutesWorked = differenceInMinutes(new Date(record.exitDateTime), new Date(record.entryDateTime));
+        }
+
+        reportRows.push({
+          docente: `${teacherData.firstName} ${teacherData.lastName}`,
+          correo: teacherData.email,
+          fecha: record.date,
+          entrada: record.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : '---',
+          salida: record.exitDateTime ? format(new Date(record.exitDateTime), 'HH:mm') : '---',
+          horas: (minutesWorked / 60).toFixed(2),
+          metodo: record.entryMethod || 'manual'
+        });
       });
-    }, 2000);
+    }
+
+    return reportRows;
+  };
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+      const data = await generateReportData();
+      const doc = new jsPDF();
+      
+      doc.text("EduTrack - Reporte de Asistencia Institucional", 14, 15);
+      doc.setFontSize(10);
+      doc.text(`Generado el: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 22);
+
+      autoTable(doc, {
+        startY: 30,
+        head: [['Docente', 'Fecha', 'Entrada', 'Salida', 'Horas', 'Método']],
+        body: data.map(row => [row.docente, row.fecha, row.entrada, row.salida, row.horas, row.metodo]),
+        theme: 'striped',
+        headStyles: { fillColor: [37, 99, 235] }
+      });
+
+      doc.save(`edutrack_reporte_${format(new Date(), 'yyyyMMdd')}.pdf`);
+      toast({ title: "PDF Generado", description: "El reporte se ha descargado correctamente." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo generar el PDF." });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const data = await generateReportData();
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Asistencia");
+      
+      XLSX.writeFile(workbook, `edutrack_nomina_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+      toast({ title: "Excel Generado", description: "El archivo de nómina está listo." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo generar el Excel." });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -56,7 +124,7 @@ export default function ReportsAdminPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <header>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Generador de Reportes</h1>
-          <p className="text-muted-foreground">Exportación de datos de nómina y cumplimiento</p>
+          <p className="text-muted-foreground">Exportación de datos de nómina y cumplimiento real</p>
         </header>
 
         <Card className="border-none shadow-xl rounded-2xl overflow-hidden">
@@ -91,19 +159,21 @@ export default function ReportsAdminPage() {
               <p className="text-sm font-bold text-slate-700">Formatos de Salida</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Button 
-                  onClick={() => handleExport('PDF')}
+                  disabled={isExporting}
+                  onClick={handleExportPDF}
                   className="h-28 flex-col gap-2 bg-white text-slate-900 border border-slate-100 hover:bg-slate-50 shadow-md hover:shadow-lg transition-all"
                 >
-                  <FileText className="h-10 w-10 text-red-500" />
+                  {isExporting ? <Loader2 className="h-10 w-10 animate-spin text-primary" /> : <FileText className="h-10 w-10 text-red-500" />}
                   <span className="font-bold">Reporte PDF</span>
                   <span className="text-[10px] text-muted-foreground">Visualización y archivo</span>
                 </Button>
                 <Button 
-                  onClick={() => handleExport('Excel')}
+                  disabled={isExporting}
+                  onClick={handleExportExcel}
                   className="h-28 flex-col gap-2 bg-white text-slate-900 border border-slate-100 hover:bg-slate-50 shadow-md hover:shadow-lg transition-all"
                 >
-                  <TableIcon className="h-10 w-10 text-green-500" />
-                  <span className="font-bold">Excel / CSV</span>
+                  {isExporting ? <Loader2 className="h-10 w-10 animate-spin text-primary" /> : <TableIcon className="h-10 w-10 text-green-500" />}
+                  <span className="font-bold">Excel / XLSX</span>
                   <span className="text-[10px] text-muted-foreground">Integración con Nómina</span>
                 </Button>
               </div>
@@ -119,7 +189,7 @@ export default function ReportsAdminPage() {
             <div>
               <p className="font-bold text-slate-800">Cálculo Automático de Horas</p>
               <p className="text-sm text-muted-foreground mt-1">
-                El sistema utiliza Cloud Functions para procesar miles de registros y calcular la diferencia exacta entre entradas y salidas, considerando las reglas de la institución.
+                El sistema procesa todos los registros de la base de datos para calcular la diferencia exacta entre entradas y salidas.
               </p>
             </div>
           </CardContent>
