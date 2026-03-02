@@ -7,18 +7,29 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { GraduationCap, Search, Loader2, History, UserPlus, Clock } from "lucide-react";
+import { GraduationCap, Search, Loader2, History, UserPlus, Clock, Pencil, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { collection, query, where, addDoc, serverTimestamp, doc } from "firebase/firestore";
+import { collection, query, where, addDoc, serverTimestamp, doc, deleteDoc } from "firebase/firestore";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useMemoFirebase } from "@/firebase/provider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function TeachersAdminPage() {
   const { user, firestore, auth } = useFirebase();
@@ -50,6 +61,22 @@ export default function TeachersAdminPage() {
   const handleLogout = async () => {
     await signOut(auth);
     router.push("/");
+  };
+
+  const handleDeleteTeacher = async (id: string) => {
+    try {
+      await deleteDoc(doc(firestore, 'userProfiles', id));
+      toast({
+        title: "Docente eliminado",
+        description: "El perfil ha sido removido del sistema."
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo eliminar al docente."
+      });
+    }
   };
 
   const handleManualMark = (teacher: any) => {
@@ -84,7 +111,7 @@ export default function TeachersAdminPage() {
   };
 
   const getShiftNames = (shiftIds?: string[]) => {
-    if (!shiftIds || !shifts) return "Sin jornadas";
+    if (!shiftIds || !shifts || shiftIds.length === 0) return "Sin jornadas";
     return shiftIds
       .map(id => shifts.find(s => s.id === id)?.name)
       .filter(Boolean)
@@ -109,9 +136,9 @@ export default function TeachersAdminPage() {
           <div className="flex items-center gap-3 w-full md:w-auto">
             <div className="relative flex-1 md:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
+              <input 
                   placeholder="Buscar docente..." 
-                  className="pl-9 bg-white border-none shadow-sm h-11"
+                  className="pl-9 bg-white border-none shadow-sm h-11 w-full rounded-md text-sm outline-none px-4"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
               />
@@ -141,7 +168,7 @@ export default function TeachersAdminPage() {
                     <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Nombre</TableHead>
                     <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Jornadas</TableHead>
                     <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] tracking-wider text-center">Marcar Jornada</TableHead>
-                    <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] tracking-wider text-right">Acción</TableHead>
+                    <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] tracking-wider text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -161,7 +188,7 @@ export default function TeachersAdminPage() {
                       <TableCell className="py-4 px-6">
                         <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
                           <Clock className="h-3 w-3 text-primary" />
-                          {getShiftNames(teacher.shiftIds)}
+                          <span className="max-w-[200px] truncate">{getShiftNames(teacher.shiftIds)}</span>
                         </div>
                       </TableCell>
                       <TableCell className="py-4 px-6 text-center">
@@ -171,12 +198,40 @@ export default function TeachersAdminPage() {
                         />
                       </TableCell>
                       <TableCell className="py-4 px-6 text-right">
-                        <Link href={`/dashboard/records?userId=${teacher.id}`}>
-                          <Button variant="ghost" size="sm" className="gap-2 text-slate-600 hover:text-primary hover:bg-primary/5">
-                            <History className="h-4 w-4" />
-                            Ver Historial
-                          </Button>
-                        </Link>
+                        <div className="flex items-center justify-end gap-2">
+                          <Link href={`/dashboard/records?userId=${teacher.id}`}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-primary hover:bg-primary/5" title="Ver Historial">
+                              <History className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          <Link href={`/dashboard/admin/teachers/edit/${teacher.id}`}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-primary hover:bg-primary/5" title="Editar">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 hover:text-destructive hover:bg-destructive/5" title="Eliminar">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>¿Está absolutamente seguro?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Esta acción eliminará el perfil de {teacher.firstName} {teacher.lastName} permanentemente. 
+                                  No se eliminarán sus registros de asistencia pasados.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.id)} className="bg-destructive hover:bg-destructive/90">
+                                  Eliminar Docente
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
