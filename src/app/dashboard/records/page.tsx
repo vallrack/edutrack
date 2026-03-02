@@ -7,14 +7,15 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { MapPin, QrCode, UserCog, Loader2, ArrowLeft } from "lucide-react";
+import { QrCode, UserCog, Loader2, ArrowLeft } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { collection, doc } from "firebase/firestore";
 import { useMemoFirebase } from "@/firebase/provider";
 import { Button } from "@/components/ui/button";
 import { signOut } from "firebase/auth";
+import { Suspense } from "react";
 
-export default function RecordsPage() {
+function RecordsContent() {
   const { user, firestore, auth } = useFirebase();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -135,5 +136,17 @@ export default function RecordsPage() {
         </Card>
       </main>
     </div>
+  );
+}
+
+export default function RecordsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#F1F3F6]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <RecordsContent />
+    </Suspense>
   );
 }
