@@ -29,6 +29,7 @@ export default function EditTeacherPage() {
   const [email, setEmail] = useState("");
   const [selectedShiftIds, setSelectedShiftIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   // Fetch current user profile for Navbar
   const adminProfileRef = useMemoFirebase(() => 
@@ -47,13 +48,14 @@ export default function EditTeacherPage() {
   const { data: shifts, isLoading: isLoadingShifts } = useCollection(shiftsQuery);
 
   useEffect(() => {
-    if (teacher) {
+    if (teacher && !hasInitialized) {
       setFirstName(teacher.firstName || "");
       setLastName(teacher.lastName || "");
       setEmail(teacher.email || "");
       setSelectedShiftIds(teacher.shiftIds || []);
+      setHasInitialized(true);
     }
-  }, [teacher]);
+  }, [teacher, hasInitialized]);
 
   const toggleShift = (shiftId: string) => {
     setSelectedShiftIds(prev => 
@@ -159,25 +161,25 @@ export default function EditTeacherPage() {
                     {shifts?.map(shift => (
                       <div 
                         key={shift.id} 
-                        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                        className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                           selectedShiftIds.includes(shift.id) 
                             ? 'bg-primary/5 border-primary shadow-sm' 
                             : 'bg-slate-50 border-transparent hover:border-slate-200'
                         }`}
-                        onClick={() => toggleShift(shift.id)}
                       >
                         <div className="flex items-center gap-3">
                           <Checkbox 
+                            id={`shift-edit-${shift.id}`}
                             checked={selectedShiftIds.includes(shift.id)}
                             onCheckedChange={() => toggleShift(shift.id)}
                           />
-                          <div>
+                          <Label htmlFor={`shift-edit-${shift.id}`} className="cursor-pointer">
                             <p className="text-sm font-bold text-slate-800">{shift.name}</p>
                             <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-medium">
                               <Clock className="h-2.5 w-2.5" />
                               {shift.startTime} - {shift.endTime}
                             </div>
-                          </div>
+                          </Label>
                         </div>
                         <div className="text-[10px] bg-white px-2 py-1 rounded-md border text-muted-foreground font-bold">
                           {shift.tolerance}m Tol.
