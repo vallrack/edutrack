@@ -1,7 +1,8 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth, useUser } from "@/firebase";
+import { useFirebase, useUser } from "@/firebase";
 import { signInWithEmailAndPassword, signInAnonymously } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -13,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 
 export default function LoginPage() {
-  const { auth } = useAuth();
+  const { auth } = useFirebase();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
   const { toast } = useToast();

@@ -1,21 +1,23 @@
+
 "use client";
 
 import { useState } from "react";
-import { useAuth, useFirestore } from "@/firebase";
+import { useAuth, useFirestore, useFirebase } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GraduationCap, ShieldCheck, Loader2, ArrowLeft } from "lucide-react";
+import { ShieldCheck, Loader2, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function SetupAdminPage() {
-  const { auth } = useAuth();
-  const { firestore } = useFirestore();
+  const { auth, firestore } = useFirebase();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -40,7 +42,7 @@ export default function SetupAdminPage() {
 
       // 2. Create Profile in userProfiles
       const profileRef = doc(firestore, "userProfiles", uid);
-      await setDoc(profileRef, {
+      const profileData = {
         id: uid,
         firebaseAuthUid: uid,
         email: email,
@@ -50,19 +52,24 @@ export default function SetupAdminPage() {
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
+      };
+
+      setDoc(profileRef, profileData).catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: profileRef.path,
+          operation: 'write',
+          requestResourceData: profileData,
+        }));
       });
 
       // 3. Create entry in roles_admins for Security Rules
       const adminRoleRef = doc(firestore, "roles_admins", uid);
-      await setDoc(adminRoleRef, {
-        id: uid,
-        firebaseAuthUid: uid,
-        email: email,
-        firstName: firstName,
-        lastName: lastName,
-        role: "admin",
-        isActive: true,
-        createdAt: new Date().toISOString()
+      setDoc(adminRoleRef, profileData).catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: adminRoleRef.path,
+          operation: 'write',
+          requestResourceData: profileData,
+        }));
       });
 
       toast({ 

@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
+import { useUser, useFirebase, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { Navbar } from "@/components/layout/Navbar";
 import { AttendanceStats } from "@/components/dashboard/AttendanceStats";
 import { QRMarker } from "@/components/attendance/QRMarker";
@@ -14,12 +15,11 @@ import { MapPin, QrCode, UserCog, Loader2 } from "lucide-react";
 import { AdminAttendanceSummary } from "@/components/admin/AdminAttendanceSummary";
 import { collection, doc, addDoc, serverTimestamp } from "firebase/firestore";
 import { signOut } from "firebase/auth";
-import { useAuth } from "@/firebase";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 export default function DashboardPage() {
-  const { user, isUserLoading } = useUser();
-  const { firestore } = useFirestore();
-  const { auth } = useAuth();
+  const { user, isUserLoading, firestore, auth } = useFirebase();
   const router = useRouter();
 
   // Profile data from Firestore
@@ -56,7 +56,7 @@ export default function DashboardPage() {
   const handleMarkAttendance = async (type: 'entry' | 'exit', location?: { latitude: number, longitude: number }) => {
     if (!user) return;
     const recordsRef = collection(firestore, 'userProfiles', user.uid, 'attendanceRecords');
-    await addDoc(recordsRef, {
+    const attendanceData = {
       userId: user.uid,
       userName: user.displayName || profile?.firstName || "Usuario",
       date: format(new Date(), 'yyyy-MM-dd'),
@@ -65,6 +65,14 @@ export default function DashboardPage() {
       method: 'qr',
       location,
       createdAt: serverTimestamp()
+    };
+
+    addDoc(recordsRef, attendanceData).catch(async (error) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: recordsRef.path,
+        operation: 'create',
+        requestResourceData: attendanceData,
+      }));
     });
   };
 
