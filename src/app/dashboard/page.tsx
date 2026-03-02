@@ -13,7 +13,7 @@ import { useEffect } from "react";
 import { format } from "date-fns";
 import { MapPin, QrCode, UserCog, Loader2 } from "lucide-react";
 import { AdminAttendanceSummary } from "@/components/admin/AdminAttendanceSummary";
-import { collection, doc, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, addDoc, serverTimestamp, query, orderBy, limit } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -28,9 +28,13 @@ export default function DashboardPage() {
   [firestore, user]);
   const { data: profile } = useDoc(profileRef);
 
-  // Attendance records (User's own)
+  // Attendance records (User's own, limited to recent)
   const attendanceQuery = useMemoFirebase(() => 
-    user ? collection(firestore, 'userProfiles', user.uid, 'attendanceRecords') : null,
+    user ? query(
+      collection(firestore, 'userProfiles', user.uid, 'attendanceRecords'),
+      orderBy('createdAt', 'desc'),
+      limit(10)
+    ) : null,
   [firestore, user]);
   const { data: attendance, isLoading: isAttendanceLoading } = useCollection(attendanceQuery);
 
@@ -53,18 +57,20 @@ export default function DashboardPage() {
     router.push("/");
   };
 
-  const handleMarkAttendance = async (type: 'entry' | 'exit', location?: { latitude: number, longitude: number }) => {
+  const handleMarkAttendance = (type: 'entry' | 'exit', location?: { latitude: number, longitude: number }) => {
     if (!user) return;
     const recordsRef = collection(firestore, 'userProfiles', user.uid, 'attendanceRecords');
+    
     const attendanceData = {
       userId: user.uid,
-      userName: user.displayName || profile?.firstName || "Usuario",
       date: format(new Date(), 'yyyy-MM-dd'),
-      time: format(new Date(), 'HH:mm'),
-      type,
-      method: 'qr',
-      location,
-      createdAt: serverTimestamp()
+      [type === 'entry' ? 'entryDateTime' : 'exitDateTime']: new Date().toISOString(),
+      [type === 'entry' ? 'entryMethod' : 'exitMethod']: 'qr',
+      [type === 'entry' ? 'entryLocationLatitude' : 'exitLocationLatitude']: location?.latitude || 0,
+      [type === 'entry' ? 'entryLocationLongitude' : 'exitLocationLongitude']: location?.longitude || 0,
+      isManualOverride: false,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
     };
 
     addDoc(recordsRef, attendanceData).catch(async (error) => {
@@ -80,18 +86,18 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar user={{ 
-        id: user.uid, 
-        name: user.displayName || profile?.firstName || "Usuario", 
-        role: profile?.role || 'teacher',
-        email: user.email || ""
-      }} onLogout={handleLogout} />
+      <Navbar user={profile ? { 
+        id: profile.id, 
+        name: `${profile.firstName} ${profile.lastName}`, 
+        role: profile.role,
+        email: profile.email
+      } : null} onLogout={handleLogout} />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-              Hola, <span className="text-primary">{(user.displayName || profile?.firstName || "Docente").split(' ')[0]}</span>
+              Hola, <span className="text-primary">{profile?.firstName || "Docente"}</span>
             </h1>
             <p className="text-muted-foreground">Resumen de actividad para hoy, {format(new Date(), 'dd MMMM yyyy')}</p>
           </div>
@@ -136,12 +142,12 @@ export default function DashboardPage() {
               <AdminAttendanceSummary attendance={attendance.map(a => ({
                 id: a.id,
                 userId: a.userId,
-                userName: a.userName,
+                userName: profile ? `${profile.firstName} ${profile.lastName}` : "Usuario",
                 date: a.date,
-                time: a.time,
-                type: a.type,
-                method: a.method,
-                location: a.location
+                time: a.entryDateTime ? format(new Date(a.entryDateTime), 'HH:mm') : '---',
+                type: 'entry',
+                method: a.entryMethod,
+                location: { latitude: a.entryLocationLatitude, longitude: a.entryLocationLongitude }
               }))} />
             )}
           </div>
@@ -150,8 +156,8 @@ export default function DashboardPage() {
             <Card className="border-none shadow-xl h-full">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle>Historial Reciente</CardTitle>
-                  <CardDescription>Datos reales extraídos de Firestore</CardDescription>
+                  <CardTitle>Registros Recientes</CardTitle>
+                  <CardDescription>Visualización de los últimos movimientos</CardDescription>
                 </div>
               </CardHeader>
               <CardContent>
@@ -159,51 +165,44 @@ export default function DashboardPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Fecha / Hora</TableHead>
-                      <TableHead>Tipo</TableHead>
                       <TableHead>Método</TableHead>
                       <TableHead className="text-right">Detalles</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {attendance?.slice(0, 10).map((record) => (
+                    {attendance?.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-medium">{record.date}</span>
-                            <span className="text-xs text-muted-foreground">{record.time}</span>
+                            <span className="font-medium">{format(new Date(record.date + 'T00:00:00'), 'dd/MM/yyyy')}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {record.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : '---'}
+                            </span>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={record.type === 'entry' ? 'default' : 'outline'} className={record.type === 'entry' ? "bg-green-500 hover:bg-green-600" : ""}>
-                            {record.type === 'entry' ? 'Entrada' : 'Salida'}
-                          </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2 text-xs">
-                            {record.method === 'qr' ? <QrCode className="h-3 w-3" /> : <UserCog className="h-3 w-3" />}
-                            {record.method === 'qr' ? 'QR' : 'Manual'}
+                            {record.entryMethod === 'qr' ? <QrCode className="h-3 w-3" /> : <UserCog className="h-3 w-3" />}
+                            {record.entryMethod === 'qr' ? 'QR' : 'Manual'}
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          {record.location && (
-                            <div className="flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
-                              <MapPin className="h-2 w-2" />
-                              {record.location.latitude.toFixed(2)}, {record.location.longitude.toFixed(2)}
-                            </div>
-                          )}
+                           <Badge variant={record.isManualOverride ? 'secondary' : 'outline'} className="text-[10px]">
+                            {record.isManualOverride ? 'Override' : 'Validado'}
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
                     {(!attendance || attendance.length === 0) && !isAttendanceLoading && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
+                        <TableCell colSpan={3} className="text-center py-12 text-muted-foreground">
                           No hay registros de asistencia en la base de datos.
                         </TableCell>
                       </TableRow>
                     )}
                     {isAttendanceLoading && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-12">
+                        <TableCell colSpan={3} className="text-center py-12">
                           <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                         </TableCell>
                       </TableRow>
