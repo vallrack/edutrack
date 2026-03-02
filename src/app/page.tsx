@@ -110,7 +110,7 @@ export default function LoginPage() {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full gap-2 h-14 font-black uppercase tracking-widest shadow-xl rounded-xl" disabled={loading}>
+              <Button type="submit" className="w-full gap-2 h-14 bg-primary text-white hover:bg-primary/90 font-black uppercase tracking-widest shadow-xl rounded-xl" disabled={loading}>
                 {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogIn className="h-5 w-5" />}
                 Iniciar Sesión
               </Button>
@@ -130,7 +130,7 @@ export default function LoginPage() {
               </Link>
 
               <Link href="/register">
-                <Button variant="outline" className="w-full gap-2 h-12 border-primary/20 text-primary hover:bg-primary/5 font-bold rounded-xl" disabled={loading}>
+                <Button variant="outline" className="w-full gap-2 h-12 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-xl" disabled={loading}>
                   <UserPlus className="h-4 w-4" />
                   Registrarme como Docente
                 </Button>
