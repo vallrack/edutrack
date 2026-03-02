@@ -7,12 +7,12 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { GraduationCap, Search, Loader2, History, UserPlus, Clock, Pencil, Trash2 } from "lucide-react";
+import { GraduationCap, Search, Loader2, History, UserPlus, Clock, Pencil, Trash2, CheckCircle2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { collection, query, where, addDoc, serverTimestamp, doc, deleteDoc } from "firebase/firestore";
+import { collection, query, where, addDoc, serverTimestamp, doc, deleteDoc, getDocs, limit, setDoc } from "firebase/firestore";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useMemoFirebase } from "@/firebase/provider";
@@ -79,35 +79,50 @@ export default function TeachersAdminPage() {
     }
   };
 
-  const handleManualMark = (teacher: any) => {
+  const handleManualFullDayMark = async (teacher: any) => {
+    const firstShiftId = teacher.shiftIds?.[0];
+    const shift = shifts?.find(s => s.id === firstShiftId);
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    
+    if (!shift) {
+      toast({ variant: "destructive", title: "Sin Jornada", description: "El docente no tiene jornadas asignadas." });
+      return;
+    }
+
     const recordsRef = collection(firestore, 'userProfiles', teacher.id, 'attendanceRecords');
+    const todayQuery = query(recordsRef, where('date', '==', todayStr), limit(1));
+    const querySnapshot = await getDocs(todayQuery);
+
+    const entryDateTime = `${todayStr}T${shift.startTime}:00`;
+    const exitDateTime = `${todayStr}T${shift.endTime}:00`;
+
     const attendanceData = {
       userId: teacher.id,
-      date: format(new Date(), 'yyyy-MM-dd'),
-      entryDateTime: new Date().toISOString(),
+      date: todayStr,
+      entryDateTime,
+      exitDateTime,
       entryMethod: 'manual',
+      exitMethod: 'manual',
       entryLocationLatitude: 0,
       entryLocationLongitude: 0,
       markedByCoordinatorId: user?.uid,
       isManualOverride: true,
-      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
 
-    addDoc(recordsRef, attendanceData)
-      .then(() => {
-        toast({
-          title: "Marcaje Manual Exitoso",
-          description: `Jornada marcada para ${teacher.firstName} ${teacher.lastName}`
-        });
-      })
-      .catch(async (error) => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: recordsRef.path,
-          operation: 'create',
-          requestResourceData: attendanceData,
-        }));
+    try {
+      if (!querySnapshot.empty) {
+        await setDoc(doc(recordsRef, querySnapshot.docs[0].id), attendanceData, { merge: true });
+      } else {
+        await addDoc(recordsRef, { ...attendanceData, createdAt: serverTimestamp() });
+      }
+      toast({
+        title: "Jornada Completa Registrada",
+        description: `Se registró el horario de ${shift.startTime} a ${shift.endTime} para ${teacher.firstName}.`
       });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo registrar la jornada." });
+    }
   };
 
   const getShiftNames = (shiftIds?: string[]) => {
@@ -192,10 +207,15 @@ export default function TeachersAdminPage() {
                         </div>
                       </TableCell>
                       <TableCell className="py-4 px-6 text-center">
-                        <Checkbox 
-                          onCheckedChange={(checked) => checked && handleManualMark(teacher)}
-                          className="h-6 w-6 border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                        />
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleManualFullDayMark(teacher)}
+                          className="h-8 gap-2 text-primary hover:bg-primary/5 font-bold"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          Día Completo
+                        </Button>
                       </TableCell>
                       <TableCell className="py-4 px-6 text-right">
                         <div className="flex items-center justify-end gap-2">
