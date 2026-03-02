@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GraduationCap, LogIn, ShieldAlert, Loader2 } from "lucide-react";
+import { GraduationCap, LogIn, ShieldAlert, Loader2, Settings } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 export default function LoginPage() {
   const { auth } = useAuth();
@@ -120,6 +121,13 @@ export default function LoginPage() {
               <ShieldAlert className="h-4 w-4" />
               Acceso Docente (Invitado)
             </Button>
+
+            <Link href="/setup-admin" className="block mt-4">
+              <Button variant="ghost" className="w-full gap-2 text-xs text-muted-foreground hover:text-primary">
+                <Settings className="h-3 w-3" />
+                Configuración Inicial Administrador
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
