@@ -5,12 +5,15 @@ import { QRCodeSVG } from "qrcode.react";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Hash, DoorOpen } from "lucide-react";
+import { MapPin, Hash, DoorOpen, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface TeacherCardQRProps {
   teacher: any;
   shifts: any[];
 }
+
+const DAY_LABELS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 
 export function TeacherCardQR({ teacher, shifts }: TeacherCardQRProps) {
   if (!teacher) return null;
@@ -26,7 +29,11 @@ export function TeacherCardQR({ teacher, shifts }: TeacherCardQRProps) {
     especialidad: teacher.specialty,
     salon: teacher.assignedRoom,
     sede: teacher.campus,
-    jornadas: teacherShifts?.map((s: any) => `${s.name} (${s.startTime}-${s.endTime})`)
+    jornadas: teacherShifts?.map((s: any) => ({
+      nombre: s.name,
+      horario: `${s.startTime}-${s.endTime}`,
+      dias: s.days
+    }))
   });
 
   return (
@@ -92,14 +99,42 @@ export function TeacherCardQR({ teacher, shifts }: TeacherCardQRProps) {
 
         <div className="pt-4 border-t border-slate-50">
           <div className="text-[8px] font-black text-slate-300 uppercase mb-3 tracking-widest text-center">Horarios Asignados</div>
-          <div className="flex flex-wrap justify-center gap-1.5">
+          <div className="grid grid-cols-1 gap-2">
             {teacherShifts?.map((s: any) => (
-              <Badge key={s.id} variant="secondary" className="text-[8px] font-bold bg-slate-50 text-slate-500 uppercase rounded-md border-none px-2 py-1">
-                {s.name}
-              </Badge>
+              <div key={s.id} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-800 uppercase tracking-tight">{s.name}</span>
+                    <div className="flex items-center gap-1 text-[9px] text-primary font-bold">
+                      <Clock className="h-2.5 w-2.5" />
+                      {s.startTime} - {s.endTime}
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-[7px] h-4 border-primary/20 text-primary font-bold">
+                    {s.tolerance}m TOL.
+                  </Badge>
+                </div>
+                <div className="flex gap-1 justify-center">
+                  {DAY_LABELS.map((label, i) => (
+                    <div 
+                      key={i} 
+                      className={cn(
+                        "text-[8px] font-black w-4 h-4 flex items-center justify-center rounded-md border transition-all",
+                        s.days?.includes(i) 
+                          ? "bg-primary text-white border-primary shadow-sm scale-110" 
+                          : "bg-white text-slate-200 border-slate-100"
+                      )}
+                    >
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              </div>
             ))}
             {(!teacherShifts || teacherShifts.length === 0) && (
-              <span className="text-[8px] text-slate-300 italic">No hay jornadas registradas</span>
+              <div className="text-center py-2">
+                <span className="text-[9px] text-slate-300 italic font-medium uppercase tracking-widest">Sin jornadas registradas</span>
+              </div>
             )}
           </div>
         </div>
