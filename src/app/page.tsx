@@ -72,12 +72,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50 relative overflow-hidden">
       {/* Abstract Background Element */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
+      <div className="absolute top-0 right-0 w-64 h-64 md:w-96 md:h-96 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+      <div className="absolute bottom-0 left-0 w-64 h-64 md:w-96 md:h-96 bg-primary/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
 
-      <div className="max-w-md w-full space-y-8 text-center z-10">
+      <div className="max-w-md w-full space-y-6 md:space-y-8 text-center z-10">
         <div className="flex flex-col items-center space-y-4">
-          <div className="relative h-20 w-72">
+          <div className="relative h-16 w-60 md:h-20 md:w-72">
             <Image 
               src="https://ciudaddonbosco.org/wp-content/uploads/2025/07/CIUDAD-DON-BOSCO_CABECERA-04-1024x284.png" 
               alt="Ciudad Don Bosco" 
@@ -87,17 +87,17 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Control de Asistencia</h1>
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Plataforma Institucional</p>
+            <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight uppercase">Control de Asistencia</h1>
+            <p className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Plataforma Institucional</p>
           </div>
         </div>
 
         <Card className="border-none shadow-2xl bg-white rounded-3xl overflow-hidden">
-          <CardHeader className="bg-slate-50/50 pb-8">
-            <CardTitle className="text-xl font-bold">Ingreso al Sistema</CardTitle>
-            <CardDescription className="text-xs">Acceda con su cuenta oficial institucional</CardDescription>
+          <CardHeader className="bg-slate-50/50 pb-6 md:pb-8">
+            <CardTitle className="text-lg md:text-xl font-bold">Ingreso al Sistema</CardTitle>
+            <CardDescription className="text-[10px] md:text-xs">Acceda con su cuenta oficial institucional</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6 text-left pt-8">
+          <CardContent className="space-y-4 md:space-y-6 text-left pt-6 md:pt-8">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-[10px] font-black uppercase text-slate-400">Correo Institucional</Label>
@@ -156,7 +156,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em]">
+        <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] pb-4">
           EduTrack &copy; Ciudad Don Bosco 2024
         </p>
       </div>

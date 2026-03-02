@@ -175,46 +175,46 @@ export default function DashboardPage() {
         email: profile.email
       } : null} onLogout={handleLogout} />
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
               Panel de <span className="text-primary">{profile?.role === 'teacher' ? 'Docente' : 'Control'}</span>
             </h1>
-            <p className="text-muted-foreground">Bienvenido, {profile?.firstName}. Hoy es {format(new Date(), 'eeee, dd MMMM')}</p>
+            <p className="text-sm text-muted-foreground font-medium">Bienvenido, {profile?.firstName}. Hoy es {format(new Date(), 'eeee, dd MMMM')}</p>
           </div>
-          <Badge variant="secondary" className="w-fit h-fit px-4 py-1 text-sm bg-white shadow-sm text-green-600 border-green-100 font-bold">
+          <Badge variant="secondary" className="w-fit h-fit px-4 py-1 text-xs md:text-sm bg-white shadow-sm text-green-600 border-green-100 font-bold">
             {profile?.campus || 'Sede Central'}
           </Badge>
         </header>
 
         <AttendanceStats records={attendance || []} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
           <div className="lg:col-span-4 space-y-6">
             <Tabs defaultValue="marking" className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-white shadow-sm h-12 rounded-xl">
-                <TabsTrigger value="marking" className="font-bold rounded-lg flex gap-2">
+                <TabsTrigger value="marking" className="font-bold rounded-lg flex gap-2 text-xs md:text-sm">
                   <Clock className="h-4 w-4" /> Marcaje
                 </TabsTrigger>
-                <TabsTrigger value="id" className="font-bold rounded-lg flex gap-2">
+                <TabsTrigger value="id" className="font-bold rounded-lg flex gap-2 text-xs md:text-sm">
                   <Smartphone className="h-4 w-4" /> Carnet
                 </TabsTrigger>
               </TabsList>
               
               <TabsContent value="marking" className="space-y-6 mt-6">
-                <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Jornadas Hoy</h2>
+                <h2 className="text-xs font-bold uppercase tracking-widest text-slate-500">Jornadas Hoy</h2>
                 {todayShifts.map((shift: any) => {
                   const record = todayRecords.find(r => r.shiftId === shift.id);
                   return (
                     <Card key={shift.id} className="border-none shadow-xl bg-white rounded-2xl overflow-hidden">
                       <CardHeader className="bg-slate-50/50 pb-4">
-                        <CardTitle className="text-md flex items-center justify-between">
+                        <CardTitle className="text-sm md:text-md flex items-center justify-between">
                           <div className="flex items-center gap-2 font-black">
                             <Clock className="h-4 w-4 text-primary" />
                             {shift.name}
                           </div>
-                          <Badge variant="outline" className="text-[10px] font-bold">
+                          <Badge variant="outline" className="text-[9px] md:text-[10px] font-bold">
                             {shift.startTime} - {shift.endTime}
                           </Badge>
                         </CardTitle>
@@ -223,7 +223,7 @@ export default function DashboardPage() {
                         <Button 
                           onClick={() => handleFullShiftMark(shift.id)}
                           disabled={!!isActionLoading || (!!record?.entryDateTime && !!record?.exitDateTime)}
-                          className="w-full h-12 bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 border flex items-center justify-between px-4 font-black rounded-xl text-xs"
+                          className="w-full h-12 bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 border flex items-center justify-between px-4 font-black rounded-xl text-[10px] md:text-xs"
                         >
                           <div className="flex items-center gap-2">
                             <Sparkles className="h-4 w-4" />
@@ -266,9 +266,9 @@ export default function DashboardPage() {
                   );
                 })}
                 {todayShifts.length === 0 && (
-                  <Card className="border-dashed border-2 bg-transparent text-center p-12">
-                    <Calendar className="h-10 w-10 text-slate-300 mx-auto mb-4" />
-                    <p className="text-sm font-medium text-slate-500">No hay jornadas programadas para hoy.</p>
+                  <Card className="border-dashed border-2 bg-transparent text-center p-8 md:p-12">
+                    <Calendar className="h-8 w-8 md:h-10 md:w-10 text-slate-300 mx-auto mb-4" />
+                    <p className="text-xs md:text-sm font-medium text-slate-500">No hay jornadas programadas para hoy.</p>
                   </Card>
                 )}
                 <QRMarker onMark={(type, loc) => {
@@ -282,8 +282,8 @@ export default function DashboardPage() {
 
               <TabsContent value="id" className="mt-6">
                  <TeacherCardQR teacher={profile} shifts={shifts || []} />
-                 <p className="text-[10px] text-center text-muted-foreground mt-4 font-medium leading-relaxed">
-                   Este carnet es personal e intransferible. <br/> Úselo para validar su ingreso en los puntos de control.
+                 <p className="text-[10px] text-center text-muted-foreground mt-4 font-medium leading-relaxed px-4">
+                   Este carnet es personal e intransferible. <br className="hidden md:block" /> Úselo para validar su ingreso en los puntos de control.
                  </p>
               </TabsContent>
             </Tabs>
@@ -291,76 +291,78 @@ export default function DashboardPage() {
 
           <div className="lg:col-span-8">
             <Card className="border-none shadow-xl h-full rounded-3xl overflow-hidden bg-white">
-              <CardHeader className="border-b border-slate-50 flex flex-row items-center justify-between py-8 px-8">
+              <CardHeader className="border-b border-slate-50 flex flex-col md:flex-row items-start md:items-center justify-between py-6 px-6 md:py-8 md:px-8 gap-4">
                 <div>
-                  <CardTitle className="text-xl font-black">Historial de Movimientos</CardTitle>
-                  <CardDescription>Seguimiento detallado por fecha</CardDescription>
+                  <CardTitle className="text-lg md:text-xl font-black">Historial de Movimientos</CardTitle>
+                  <CardDescription className="text-xs">Seguimiento detallado por fecha</CardDescription>
                 </div>
-                <Badge variant="outline" className="font-black border-primary/20 text-primary rounded-lg px-4 py-1">
+                <Badge variant="outline" className="font-black border-primary/20 text-primary rounded-lg px-4 py-1 text-[10px]">
                   {attendance?.length || 0} Registros
                 </Badge>
               </CardHeader>
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader className="bg-slate-50/50">
-                    <TableRow>
-                      <TableHead className="px-8 py-4 uppercase text-[10px] font-black text-slate-400">Fecha / Jornada</TableHead>
-                      <TableHead className="py-4 uppercase text-[10px] font-black text-slate-400">Marcajes</TableHead>
-                      <TableHead className="py-4 uppercase text-[10px] font-black text-slate-400">Método</TableHead>
-                      <TableHead className="text-right px-8 py-4 uppercase text-[10px] font-black text-slate-400">Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {attendance?.map((record) => {
-                      const shift = shifts?.find(s => s.id === record.shiftId);
-                      return (
-                        <TableRow key={record.id} className="hover:bg-slate-50/30 transition-colors border-slate-50">
-                          <TableCell className="px-8 py-5">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-slate-800">
-                                {format(new Date(record.date + 'T00:00:00'), 'dd/MM/yyyy')}
-                              </span>
-                              <span className="text-[10px] text-primary font-black uppercase tracking-tight">
-                                {shift?.name || '---'}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-5">
-                            <div className="flex flex-col gap-1">
-                              <div className="text-xs font-black text-green-600 flex items-center gap-2">
-                                <span className="w-4 h-4 rounded bg-green-50 flex items-center justify-center text-[8px] border border-green-100">E</span>
-                                {record.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : '--:--'}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-50/50">
+                      <TableRow>
+                        <TableHead className="px-6 md:px-8 py-4 uppercase text-[9px] md:text-[10px] font-black text-slate-400">Fecha / Jornada</TableHead>
+                        <TableHead className="py-4 uppercase text-[9px] md:text-[10px] font-black text-slate-400">Marcajes</TableHead>
+                        <TableHead className="py-4 uppercase text-[9px] md:text-[10px] font-black text-slate-400">Método</TableHead>
+                        <TableHead className="text-right px-6 md:px-8 py-4 uppercase text-[9px] md:text-[10px] font-black text-slate-400">Estado</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {attendance?.map((record) => {
+                        const shift = shifts?.find(s => s.id === record.shiftId);
+                        return (
+                          <TableRow key={record.id} className="hover:bg-slate-50/30 transition-colors border-slate-50">
+                            <TableCell className="px-6 md:px-8 py-4 md:py-5">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-slate-800 text-xs md:text-sm">
+                                  {format(new Date(record.date + 'T00:00:00'), 'dd/MM/yyyy')}
+                                </span>
+                                <span className="text-[9px] md:text-[10px] text-primary font-black uppercase tracking-tight">
+                                  {shift?.name || '---'}
+                                </span>
                               </div>
-                              <div className="text-xs font-black text-orange-600 flex items-center gap-2">
-                                <span className="w-4 h-4 rounded bg-orange-50 flex items-center justify-center text-[8px] border border-orange-100">S</span>
-                                {record.exitDateTime ? format(new Date(record.exitDateTime), 'HH:mm') : '--:--'}
+                            </TableCell>
+                            <TableCell className="py-4 md:py-5">
+                              <div className="flex flex-col gap-1">
+                                <div className="text-[10px] md:text-xs font-black text-green-600 flex items-center gap-2">
+                                  <span className="w-4 h-4 rounded bg-green-50 flex items-center justify-center text-[8px] border border-green-100">E</span>
+                                  {record.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : '--:--'}
+                                </div>
+                                <div className="text-[10px] md:text-xs font-black text-orange-600 flex items-center gap-2">
+                                  <span className="w-4 h-4 rounded bg-orange-50 flex items-center justify-center text-[8px] border border-orange-100">S</span>
+                                  {record.exitDateTime ? format(new Date(record.exitDateTime), 'HH:mm') : '--:--'}
+                                </div>
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-5">
-                            <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-tighter bg-white border">
-                              {record.entryMethod === 'qr' ? 'QR SCAN' : 'MANUAL'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right px-8 py-5">
-                             {record.exitDateTime ? (
-                               <Badge className="bg-green-500 hover:bg-green-600 text-[10px] font-bold rounded-lg px-3">CUMPLIDO</Badge>
-                             ) : (
-                               <Badge variant="secondary" className="text-[10px] font-bold rounded-lg px-3">EN PROCESO</Badge>
-                             )}
+                            </TableCell>
+                            <TableCell className="py-4 md:py-5">
+                              <Badge variant="secondary" className="text-[8px] md:text-[9px] font-black uppercase tracking-tighter bg-white border">
+                                {record.entryMethod === 'qr' ? 'QR SCAN' : 'MANUAL'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right px-6 md:px-8 py-4 md:py-5">
+                               {record.exitDateTime ? (
+                                 <Badge className="bg-green-500 hover:bg-green-600 text-[8px] md:text-[10px] font-bold rounded-lg px-2 md:px-3">CUMPLIDO</Badge>
+                               ) : (
+                                 <Badge variant="secondary" className="text-[8px] md:text-[10px] font-bold rounded-lg px-2 md:px-3">PROCESO</Badge>
+                               )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {(!attendance || attendance.length === 0) && !isAttendanceLoading && (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-20 md:py-24 text-muted-foreground text-xs italic">
+                            No hay actividad registrada.
                           </TableCell>
                         </TableRow>
-                      );
-                    })}
-                    {(!attendance || attendance.length === 0) && !isAttendanceLoading && (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-24 text-muted-foreground italic">
-                          No hay actividad registrada.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </div>

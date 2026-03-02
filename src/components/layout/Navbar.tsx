@@ -21,10 +21,10 @@ export function Navbar({ user, onLogout }: NavbarProps) {
   return (
     <nav className="border-b bg-white/90 backdrop-blur-md sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-20 items-center">
-          <div className="flex items-center gap-4">
+        <div className="flex justify-between h-16 md:h-20 items-center">
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
             <Link href="/dashboard" className="flex items-center gap-3">
-              <div className="relative h-12 w-44">
+              <div className="relative h-10 w-36 md:h-12 md:w-44">
                 <Image 
                   src="https://ciudaddonbosco.org/wp-content/uploads/2025/07/CIUDAD-DON-BOSCO_CABECERA-04-1024x284.png" 
                   alt="Ciudad Don Bosco" 
@@ -36,19 +36,19 @@ export function Navbar({ user, onLogout }: NavbarProps) {
             </Link>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-4">
+          <div className="flex items-center gap-1 sm:gap-2 md:gap-4 ml-2 overflow-x-auto no-scrollbar">
             <Link href="/dashboard">
-              <Button variant="ghost" className="flex items-center gap-2 hover:text-primary">
+              <Button variant="ghost" size="sm" className="flex items-center gap-1.5 md:gap-2 hover:text-primary px-2 md:px-4">
                 <LayoutDashboard className="h-4 w-4" />
-                <span className="hidden md:inline">Dashboard</span>
+                <span className="hidden lg:inline">Dashboard</span>
               </Button>
             </Link>
 
             {user.role === 'teacher' && (
               <Link href="/dashboard/records">
-                <Button variant="ghost" className="flex items-center gap-2 hover:text-primary">
+                <Button variant="ghost" size="sm" className="flex items-center gap-1.5 md:gap-2 hover:text-primary px-2 md:px-4">
                   <History className="h-4 w-4" />
-                  <span className="hidden md:inline">Mis Registros</span>
+                  <span className="hidden lg:inline">Mis Registros</span>
                 </Button>
               </Link>
             )}
@@ -56,40 +56,40 @@ export function Navbar({ user, onLogout }: NavbarProps) {
             {(user.role === 'admin' || user.role === 'coordinator') && (
               <>
                 <Link href="/dashboard/admin/teachers">
-                  <Button variant="ghost" className="flex items-center gap-2 hover:text-primary">
+                  <Button variant="ghost" size="sm" className="flex items-center gap-1.5 md:gap-2 hover:text-primary px-2 md:px-4">
                     <Users className="h-4 w-4" />
-                    <span className="hidden md:inline">Docentes</span>
+                    <span className="hidden lg:inline">Docentes</span>
                   </Button>
                 </Link>
                 <Link href="/dashboard/admin/shifts">
-                  <Button variant="ghost" className="flex items-center gap-2 hover:text-primary">
+                  <Button variant="ghost" size="sm" className="flex items-center gap-1.5 md:gap-2 hover:text-primary px-2 md:px-4">
                     <Clock className="h-4 w-4" />
-                    <span className="hidden md:inline">Jornadas</span>
+                    <span className="hidden lg:inline">Jornadas</span>
                   </Button>
                 </Link>
                 <Link href="/dashboard/admin/reports">
-                  <Button variant="ghost" className="flex items-center gap-2 hover:text-primary">
+                  <Button variant="ghost" size="sm" className="flex items-center gap-1.5 md:gap-2 hover:text-primary px-2 md:px-4">
                     <ShieldCheck className="h-4 w-4" />
-                    <span className="hidden md:inline">Reportes</span>
+                    <span className="hidden lg:inline">Reportes</span>
                   </Button>
                 </Link>
               </>
             )}
 
-            <div className="h-8 w-[1px] bg-border mx-2" />
+            <div className="h-6 w-[1px] bg-border mx-1 md:mx-2 shrink-0" />
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3 shrink-0">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-bold leading-none">{user.name}</p>
-                <p className="text-[10px] text-muted-foreground uppercase font-black mt-1">{user.role}</p>
+                <p className="text-[10px] md:text-sm font-bold leading-none truncate max-w-[80px] md:max-w-none">{user.name}</p>
+                <p className="text-[8px] md:text-[10px] text-muted-foreground uppercase font-black mt-1">{user.role}</p>
               </div>
               <Button
                 variant="outline"
                 size="icon"
                 onClick={onLogout}
-                className="rounded-full border-primary/20 text-primary hover:bg-primary/10 transition-colors"
+                className="h-8 w-8 md:h-10 md:w-10 rounded-full border-primary/20 text-primary hover:bg-primary/10 transition-colors"
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-3.5 w-3.5 md:h-4 md:w-4" />
               </Button>
             </div>
           </div>
