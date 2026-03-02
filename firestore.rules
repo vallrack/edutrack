@@ -10,12 +10,13 @@ service cloud.firestore {
 
     match /userProfiles/{userId} {
       allow read: if isPrivileged() || request.auth.uid == userId;
-      allow write: if isPrivileged();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isPrivileged() || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
     }
 
     match /roles_admins/{userId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId && !exists(/databases/$(database)/documents/roles_admins/$(userId));
       allow update, delete: if isAdmin();
     }
 
@@ -25,7 +26,7 @@ service cloud.firestore {
     }
 
     match /shifts/{shiftId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if isPrivileged();
     }
 

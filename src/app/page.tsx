@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GraduationCap, LogIn, ShieldAlert, Loader2, Settings } from "lucide-react";
+import { GraduationCap, LogIn, ShieldAlert, Loader2, Settings, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -76,7 +76,7 @@ export default function LoginPage() {
             <GraduationCap className="h-12 w-12 text-white" />
           </div>
           <h1 className="text-4xl font-black text-primary tracking-tight">EduTrack</h1>
-          <p className="text-muted-foreground mt-2">Sistema de Control Real</p>
+          <p className="text-muted-foreground mt-2">Sistema de Control Institucional</p>
         </div>
 
         <Card className="border-none shadow-2xl bg-white/80 backdrop-blur-xl">
@@ -107,24 +107,31 @@ export default function LoginPage() {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full gap-2" disabled={loading}>
+              <Button type="submit" className="w-full gap-2 h-11 font-bold shadow-lg" disabled={loading}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
                 Entrar al Sistema
               </Button>
             </form>
             
-            <div className="relative">
+            <div className="relative py-4">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">O continuar como</span></div>
+              <div className="relative flex justify-center text-xs uppercase"><span className="bg-white/80 px-2 text-muted-foreground">O</span></div>
             </div>
 
-            <Button variant="outline" className="w-full gap-2" onClick={handleGuestLogin} disabled={loading}>
-              <ShieldAlert className="h-4 w-4" />
-              Acceso Docente (Invitado)
+            <Link href="/register">
+              <Button variant="outline" className="w-full gap-2 border-primary/20 text-primary hover:bg-primary/5 font-bold" disabled={loading}>
+                <UserPlus className="h-4 w-4" />
+                Registrarme como Docente
+              </Button>
+            </Link>
+
+            <Button variant="ghost" className="w-full gap-2 text-xs text-muted-foreground" onClick={handleGuestLogin} disabled={loading}>
+              <ShieldAlert className="h-3 w-3" />
+              Acceso Rápido Invitado
             </Button>
 
             <Link href="/setup-admin" className="block mt-4">
-              <Button variant="ghost" className="w-full gap-2 text-xs text-muted-foreground hover:text-primary">
+              <Button variant="link" className="w-full gap-2 text-[10px] text-muted-foreground/60 hover:text-primary">
                 <Settings className="h-3 w-3" />
                 Configuración Inicial Administrador
               </Button>
@@ -132,8 +139,8 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-xs text-muted-foreground">
-          Conectado a Firebase: schedulecontrol-f8b77
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
+          EduTrack • schedulecontrol-f8b77
         </p>
       </div>
     </div>
