@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, History, UserPlus, Pencil, Trash2, CheckCircle2, QrCode, User } from "lucide-react";
+import { Search, Loader2, History, UserPlus, Pencil, Trash2, CheckCircle2, QrCode } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -42,7 +42,7 @@ const DAY_INITIALS = ["D", "L", "M", "M", "J", "V", "S"];
 
 export default function TeachersAdminPage() {
   const { firestore, auth } = useFirebase();
-  const { user, isUserLoading: isAuthLoading } = useUser();
+  const { user } = useUser();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const { toast } = useToast();
@@ -50,7 +50,7 @@ export default function TeachersAdminPage() {
   const profileRef = useMemoFirebase(() => 
     user ? doc(firestore, 'userProfiles', user.uid) : null, 
   [firestore, user]);
-  const { data: profile, isLoading: isProfileLoading } = useDoc(profileRef);
+  const { data: profile } = useDoc(profileRef);
 
   const teachersQuery = useMemoFirebase(() => {
     if (!user) return null;
@@ -148,7 +148,7 @@ export default function TeachersAdminPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Directorio de Docentes</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight uppercase">Directorio de Docentes</h1>
             <p className="text-sm text-muted-foreground font-medium">Gestión de personal, carnets y validación de jornadas.</p>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">

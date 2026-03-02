@@ -3,7 +3,7 @@
 
 import { QRCodeSVG } from "qrcode.react";
 import Image from "next/image";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Hash, DoorOpen, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -129,7 +129,7 @@ export function TeacherCardQR({ teacher, shifts }: TeacherCardQRProps) {
         </div>
       </CardContent>
       <div className="bg-slate-50 py-4 text-center border-t border-slate-100">
-        <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.25em]">EduTrack • Sistema de Control</p>
+        <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.25em]">EduTrack • Ciudad Don Bosco</p>
       </div>
     </Card>
   );
