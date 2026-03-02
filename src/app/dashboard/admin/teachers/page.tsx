@@ -13,7 +13,7 @@ import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, addDoc, serverTimestamp, doc, deleteDoc, getDocs, limit, setDoc } from "firebase/firestore";
 import { useMemoFirebase } from "@/firebase/provider";
-import Link from "link";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import {
