@@ -1,11 +1,10 @@
-
 "use client";
 
 import { useAppStore } from "@/lib/store";
 import { Navbar } from "@/components/layout/Navbar";
 import { AttendanceStats } from "@/components/dashboard/AttendanceStats";
 import { QRMarker } from "@/components/attendance/QRMarker";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
