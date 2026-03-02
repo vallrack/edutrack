@@ -2,9 +2,10 @@
 "use client";
 
 import { QRCodeSVG } from "qrcode.react";
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { GraduationCap, MapPin, Hash, DoorOpen } from "lucide-react";
+import { MapPin, Hash, DoorOpen } from "lucide-react";
 
 interface TeacherCardQRProps {
   teacher: any;
@@ -30,15 +31,24 @@ export function TeacherCardQR({ teacher, shifts }: TeacherCardQRProps) {
 
   return (
     <Card className="border-none shadow-2xl bg-white rounded-3xl overflow-hidden max-w-sm mx-auto">
-      <CardHeader className="bg-primary text-white p-6 pb-12 text-center relative">
+      <CardHeader className="bg-primary text-white p-6 pb-14 text-center relative">
         <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-white p-2 rounded-2xl shadow-lg border-4 border-white">
           <QRCodeSVG value={qrData} size={100} level="H" />
         </div>
-        <CardTitle className="text-lg font-black uppercase tracking-widest flex items-center justify-center gap-2">
-          <GraduationCap className="h-5 w-5" />
-          Ciudad Don Bosco
-        </CardTitle>
-        <div className="text-primary-foreground/80 text-[9px] font-black uppercase mt-1 tracking-widest">Carnet de Docente</div>
+        <div className="flex flex-col items-center gap-2">
+          <div className="relative h-10 w-48 mb-1">
+            <Image 
+              src="https://ciudaddonbosco.org/wp-content/uploads/2025/07/CIUDAD-DON-BOSCO_CABECERA-04-1024x284.png" 
+              alt="Ciudad Don Bosco" 
+              fill
+              className="object-contain brightness-0 invert"
+              priority
+            />
+          </div>
+          <div className="text-primary-foreground/90 text-[10px] font-black uppercase tracking-[0.2em] leading-none">
+            Identificación Institucional
+          </div>
+        </div>
       </CardHeader>
       
       <CardContent className="pt-16 pb-8 px-8 space-y-6">
@@ -46,7 +56,9 @@ export function TeacherCardQR({ teacher, shifts }: TeacherCardQRProps) {
           <h3 className="text-xl font-black text-slate-800 uppercase leading-none tracking-tight">
             {teacher.firstName} {teacher.lastName}
           </h3>
-          <div className="text-primary font-bold text-[10px] uppercase tracking-[0.15em]">{teacher.specialty || 'Docente de Planta'}</div>
+          <div className="text-primary font-bold text-[10px] uppercase tracking-[0.15em]">
+            {teacher.specialty || 'Personal Institucional'}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 pt-2">
@@ -76,18 +88,21 @@ export function TeacherCardQR({ teacher, shifts }: TeacherCardQRProps) {
         </div>
 
         <div className="pt-4 border-t border-slate-50">
-          <div className="text-[8px] font-black text-slate-300 uppercase mb-2 tracking-widest">Horarios Institucionales</div>
+          <div className="text-[8px] font-black text-slate-300 uppercase mb-2 tracking-widest">Horarios Asignados</div>
           <div className="flex flex-wrap gap-1">
             {teacherShifts?.map((s: any) => (
               <Badge key={s.id} variant="secondary" className="text-[8px] font-bold bg-slate-50 text-slate-500 uppercase rounded-sm border-none">
                 {s.name}
               </Badge>
             ))}
+            {(!teacherShifts || teacherShifts.length === 0) && (
+              <span className="text-[8px] text-slate-300 italic">No hay jornadas registradas</span>
+            )}
           </div>
         </div>
       </CardContent>
       <div className="bg-slate-50 py-3 text-center border-t border-slate-100">
-        <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em]">Asistencia Digital EduTrack</p>
+        <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em]">EduTrack • Sistema de Control</p>
       </div>
     </Card>
   );

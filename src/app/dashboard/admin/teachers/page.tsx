@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { TeacherCardQR } from "@/components/attendance/TeacherCardQR";
 
@@ -257,7 +258,11 @@ export default function TeachersAdminPage() {
                                 <QrCode className="h-4 w-4" />
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-md border-none bg-transparent shadow-none p-0">
+                            <DialogContent className="sm:max-w-md border-none bg-transparent shadow-none p-0 overflow-hidden">
+                               <DialogHeader className="sr-only">
+                                 <DialogTitle>Carnet de {teacher.firstName} {teacher.lastName}</DialogTitle>
+                                 <DialogDescription>Información institucional del docente y código QR para validación.</DialogDescription>
+                               </DialogHeader>
                                <TeacherCardQR teacher={teacher} shifts={shifts || []} />
                             </DialogContent>
                           </Dialog>
