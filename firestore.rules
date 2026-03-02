@@ -26,17 +26,21 @@ service cloud.firestore {
 
     // --- RULES ---
 
-    // Acceso total para Privilegiados en todas las colecciones principales
-    // Acceso restringido para usuarios normales basado en propiedad
-
     match /userProfiles/{userId} {
       allow read: if isPrivileged() || isOwner(userId);
-      allow write: if isPrivileged() || (isOwner(userId) && request.resource.data.role == resource.data.role);
+      // Permitir creación si es el dueño (para el setup inicial)
+      allow create: if isOwner(userId);
+      // Permitir actualización si es privilegiado o dueño (sin escalar el rol)
+      allow update: if isPrivileged() || (isOwner(userId) && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
     }
 
     match /roles_admins/{userId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      // Bootstrapping: Permitir que un usuario se asigne como admin si es su propio UID
+      // Esto permite que el SetupAdminPage funcione para el primer usuario
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update, delete: if isAdmin();
     }
 
     match /roles_coordinators/{userId} {
