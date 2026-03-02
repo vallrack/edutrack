@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { GraduationCap, LogOut, LayoutDashboard, History, ShieldCheck, Users } from "lucide-react";
+import { GraduationCap, LogOut, LayoutDashboard, History, ShieldCheck, Users, Clock } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface NavbarProps {
@@ -53,6 +53,12 @@ export function Navbar({ user, onLogout }: NavbarProps) {
                   <Button variant="ghost" className="flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     <span className="hidden md:inline">Docentes</span>
+                  </Button>
+                </Link>
+                <Link href="/dashboard/admin/shifts">
+                  <Button variant="ghost" className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span className="hidden md:inline">Jornadas</span>
                   </Button>
                 </Link>
                 <Link href="/dashboard/admin/reports">

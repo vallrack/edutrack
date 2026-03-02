@@ -1,44 +1,20 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- HELPER FUNCTIONS ---
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admins/$(request.auth.uid));
-    }
-
-    function isCoordinator() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_coordinators/$(request.auth.uid));
-    }
-
-    function isPrivileged() {
-      return isAdmin() || isCoordinator();
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // --- RULES ---
+    function isSignedIn() { return request.auth != null; }
+    function isAdmin() { return isSignedIn() && exists(/databases/$(database)/documents/roles_admins/$(request.auth.uid)); }
+    function isCoordinator() { return isSignedIn() && exists(/databases/$(database)/documents/roles_coordinators/$(request.auth.uid)); }
+    function isPrivileged() { return isAdmin() || isCoordinator(); }
 
     match /userProfiles/{userId} {
-      allow read: if isPrivileged() || isOwner(userId);
-      // Permitir creación si es el dueño (para el setup inicial)
-      allow create: if isOwner(userId);
-      // Permitir actualización si es privilegiado o dueño (sin escalar el rol)
-      allow update: if isPrivileged() || (isOwner(userId) && request.resource.data.role == resource.data.role);
-      allow delete: if isAdmin();
+      allow read: if isPrivileged() || request.auth.uid == userId;
+      allow write: if isPrivileged();
     }
 
     match /roles_admins/{userId} {
       allow read: if isSignedIn();
-      // Bootstrapping: Permitir que un usuario se asigne como admin si es su propio UID
-      // Esto permite que el SetupAdminPage funcione para el primer usuario
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update, delete: if isAdmin();
     }
@@ -48,16 +24,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    match /userProfiles/{userId}/attendanceRecords/{recordId} {
-      allow read: if isPrivileged() || isOwner(userId);
-      allow create: if (isPrivileged() || isOwner(userId)) && request.resource.data.userId == userId;
-      allow update: if isPrivileged() || isOwner(userId);
-      allow delete: if isPrivileged();
+    match /shifts/{shiftId} {
+      allow read: if isSignedIn();
+      allow write: if isPrivileged();
     }
 
-    // Permitir a administradores y coordinadores leer CUALQUIER registro de asistencia vía queries de grupo
-    match /{path=**}/attendanceRecords/{recordId} {
-      allow read: if isPrivileged();
+    match /userProfiles/{userId}/attendanceRecords/{recordId} {
+      allow read: if isPrivileged() || request.auth.uid == userId;
+      allow write: if isPrivileged() || request.auth.uid == userId;
     }
   }
 }

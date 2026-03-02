@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { GraduationCap, Search, Loader2, History } from "lucide-react";
+import { GraduationCap, Search, Loader2, History, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
@@ -96,16 +96,24 @@ export default function TeachersAdminPage() {
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight">Directorio de Docentes</h1>
-            <p className="text-muted-foreground">Supervisión y marcaje manual de asistencia</p>
+            <p className="text-muted-foreground">Supervisión y registro de personal docente.</p>
           </div>
-          <div className="relative w-full md:w-80">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-                placeholder="Buscar docente..." 
-                className="pl-9 bg-white border-none shadow-sm h-11"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                  placeholder="Buscar docente..." 
+                  className="pl-9 bg-white border-none shadow-sm h-11"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Link href="/dashboard/admin/teachers/add">
+              <Button className="h-11 gap-2 font-bold shadow-lg">
+                <UserPlus className="h-4 w-4" />
+                Nuevo Docente
+              </Button>
+            </Link>
           </div>
         </header>
 
