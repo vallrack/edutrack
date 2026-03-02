@@ -16,8 +16,6 @@ interface NavbarProps {
 export function Navbar({ user, onLogout }: NavbarProps) {
   const router = useRouter();
 
-  if (!user) return null;
-
   return (
     <nav className="border-b bg-white/95 backdrop-blur-md sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,7 +46,7 @@ export function Navbar({ user, onLogout }: NavbarProps) {
               </Button>
             </Link>
 
-            {user.role === 'teacher' && (
+            {user?.role === 'teacher' && (
               <Link href="/dashboard/records">
                 <Button
                   variant="ghost"
@@ -61,7 +59,7 @@ export function Navbar({ user, onLogout }: NavbarProps) {
               </Link>
             )}
 
-            {(user.role === 'admin' || user.role === 'coordinator') && (
+            {(user?.role === 'admin' || user?.role === 'coordinator') && (
               <>
                 <Link href="/dashboard/admin/teachers">
                   <Button
@@ -99,22 +97,28 @@ export function Navbar({ user, onLogout }: NavbarProps) {
             <div className="h-6 w-[1px] bg-border mx-1 md:mx-2 shrink-0" />
 
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
-              <div className="text-right hidden sm:block">
-                <p className="text-[10px] md:text-sm font-black leading-none truncate max-w-[100px] md:max-w-none text-slate-800">
-                  {user.name}
-                </p>
-                <p className="text-[8px] md:text-[10px] text-primary uppercase font-black mt-1">
-                  {user.role}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={onLogout}
-                className="h-8 w-8 md:h-10 md:w-10 rounded-full border-primary/20 text-primary hover:bg-primary/10 transition-colors"
-              >
-                <LogOut className="h-3.5 w-3.5 md:h-4 md:w-4" />
-              </Button>
+              {user ? (
+                <>
+                  <div className="text-right hidden sm:block">
+                    <p className="text-[10px] md:text-sm font-black leading-none truncate max-w-[100px] md:max-w-none text-slate-800">
+                      {user.name}
+                    </p>
+                    <p className="text-[8px] md:text-[10px] text-primary uppercase font-black mt-1">
+                      {user.role}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={onLogout}
+                    className="h-8 w-8 md:h-10 md:w-10 rounded-full border-primary/20 text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <LogOut className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                  </Button>
+                </>
+              ) : (
+                <div className="h-8 w-8 md:h-10 md:w-10 rounded-full bg-slate-100 animate-pulse" />
+              )}
             </div>
           </div>
         </div>

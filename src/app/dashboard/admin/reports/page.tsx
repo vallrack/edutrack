@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useFirebase, useDoc, useMemoFirebase } from "@/firebase";
+import { useFirebase, useDoc, useMemoFirebase, useUser } from "@/firebase";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,8 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
 export default function ReportsAdminPage() {
-  const { user, firestore, auth } = useFirebase();
+  const { firestore, auth } = useFirebase();
+  const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
   const [isExporting, setIsExporting] = useState(false);
@@ -74,7 +75,7 @@ export default function ReportsAdminPage() {
       const data = await generateReportData();
       const doc = new jsPDF();
       
-      doc.text("EduTrack - Reporte de Asistencia Institucional", 14, 15);
+      doc.text("Ciudad Don Bosco - Reporte de Asistencia", 14, 15);
       doc.setFontSize(10);
       doc.text(`Generado el: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 22);
 
@@ -83,10 +84,10 @@ export default function ReportsAdminPage() {
         head: [['Docente', 'Fecha', 'Entrada', 'Salida', 'Horas', 'Método']],
         body: data.map(row => [row.docente, row.fecha, row.entrada, row.salida, row.horas, row.metodo]),
         theme: 'striped',
-        headStyles: { fillColor: [37, 99, 235] }
+        headStyles: { fillColor: [204, 38, 38] } // Rojo Institucional
       });
 
-      doc.save(`edutrack_reporte_${format(new Date(), 'yyyyMMdd')}.pdf`);
+      doc.save(`don_bosco_reporte_${format(new Date(), 'yyyyMMdd')}.pdf`);
       toast({ title: "PDF Generado", description: "El reporte se ha descargado correctamente." });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "No se pudo generar el PDF." });
@@ -103,7 +104,7 @@ export default function ReportsAdminPage() {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Asistencia");
       
-      XLSX.writeFile(workbook, `edutrack_nomina_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+      XLSX.writeFile(workbook, `don_bosco_nomina_${format(new Date(), 'yyyyMMdd')}.xlsx`);
       toast({ title: "Excel Generado", description: "El archivo de nómina está listo." });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "No se pudo generar el Excel." });
@@ -112,14 +113,21 @@ export default function ReportsAdminPage() {
     }
   };
 
+  const navbarUser = profile ? {
+    id: profile.id,
+    name: `${profile.firstName} ${profile.lastName}`,
+    role: profile.role,
+    email: profile.email
+  } : user ? {
+    id: user.uid,
+    name: user.displayName || 'Cargando...',
+    role: 'admin' as any,
+    email: user.email || ''
+  } : null;
+
   return (
     <div className="min-h-screen bg-[#F1F3F6]">
-      <Navbar user={profile ? { 
-        id: profile.id, 
-        name: `${profile.firstName} ${profile.lastName}`, 
-        role: profile.role,
-        email: profile.email
-      } : null} onLogout={handleLogout} />
+      <Navbar user={navbarUser} onLogout={handleLogout} />
       
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <header>
