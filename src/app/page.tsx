@@ -4,12 +4,12 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useFirebase, useUser } from "@/firebase";
-import { signInWithEmailAndPassword, signInAnonymously } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogIn, ShieldAlert, Loader2, Settings, UserPlus, QrCode } from "lucide-react";
+import { LogIn, Loader2, QrCode, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -44,18 +44,6 @@ export default function LoginPage() {
         title: "Error de autenticación", 
         description: "Credenciales inválidas o error de conexión." 
       });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGuestLogin = async () => {
-    setLoading(true);
-    try {
-      await signInAnonymously(auth);
-      toast({ title: "Acceso Invitado", description: "Entrando como docente temporal." });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "No se pudo iniciar sesión anónima." });
     } finally {
       setLoading(false);
     }
@@ -145,20 +133,6 @@ export default function LoginPage() {
                 <Button variant="outline" className="w-full gap-2 h-12 border-primary/20 text-primary hover:bg-primary/5 font-bold rounded-xl" disabled={loading}>
                   <UserPlus className="h-4 w-4" />
                   Registrarme como Docente
-                </Button>
-              </Link>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Button variant="ghost" className="w-full gap-2 text-[10px] font-black text-muted-foreground uppercase tracking-wider h-10" onClick={handleGuestLogin} disabled={loading}>
-                <ShieldAlert className="h-3 w-3" />
-                Acceso Rápido Temporal
-              </Button>
-
-              <Link href="/setup-admin">
-                <Button variant="link" className="w-full gap-2 text-[9px] text-slate-400 hover:text-primary uppercase font-bold">
-                  <Settings className="h-3 w-3" />
-                  Panel de Administración
                 </Button>
               </Link>
             </div>
