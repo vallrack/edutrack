@@ -2,27 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * CORE PHILOSOPHY:
-     * This ruleset implements a robust, role-based access control (RBAC) model designed for high security
-     * and rapid prototyping. It prioritizes "Authorization Independence" by using dedicated role 
-     * collections to avoid recursive or slow get() calls.
-     *
-     * DATA STRUCTURE:
-     * - /userProfiles/{uid}: Individual user profiles.
-     * - /roles_admins/{uid}: Indicator documents for Administrative users.
-     * - /roles_coordinators/{uid}: Indicator documents for Coordinator users.
-     * - /userProfiles/{uid}/attendanceRecords/{id}: Attendance logs nested under the owner's profile.
-     *
-     * KEY SECURITY DECISIONS:
-     * - Admins and Coordinators have unrestricted access to read and write all data to facilitate management.
-     * - Regular users (Teachers/Staff) are restricted to their own data tree (Path-Based Ownership).
-     * - Relational integrity is enforced by ensuring the internal 'userId' or 'firebaseAuthUid' matches the URL path.
-     * - Structural Segregation: Administrative roles are stored in separate top-level collections to make 
-     *   security checks fast and isolated from profile data changes.
-     */
-
-    // --- GLOBAL HELPER FUNCTIONS ---
+    // --- HELPER FUNCTIONS ---
 
     function isSignedIn() {
       return request.auth != null;
@@ -36,7 +16,6 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/roles_coordinators/$(request.auth.uid));
     }
 
-    // Helper to check if user is any type of management/privileged account
     function isPrivileged() {
       return isAdmin() || isCoordinator();
     }
@@ -45,72 +24,36 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isExistingOwner(userId) {
-      return resource != null && isOwner(userId);
-    }
+    // --- RULES ---
 
-    // --- COLLECTION RULES ---
+    // Acceso total para Privilegiados en todas las colecciones principales
+    // Acceso restringido para usuarios normales basado en propiedad
 
-    /**
-     * @description Rules for the UserProfile collection. Allows users to manage their own profiles and privileged users to manage everyone.
-     * @path /userProfiles/{userId}
-     * @allow (get) If the user is the owner or an admin/coordinator.
-     * @deny (write) If a non-privileged user tries to modify a profile that is not their own.
-     * @principle Path-based ownership for users, combined with role-based overrides.
-     */
     match /userProfiles/{userId} {
-      allow get: if isOwner(userId) || isPrivileged();
-      allow list: if isPrivileged();
-      allow create: if (isOwner(userId) || isPrivileged()) && request.resource.data.firebaseAuthUid == userId;
-      allow update: if (isExistingOwner(userId) || isPrivileged()) && request.resource.data.firebaseAuthUid == resource.data.firebaseAuthUid;
-      allow delete: if isAdmin();
+      allow read: if isPrivileged() || isOwner(userId);
+      allow write: if isPrivileged() || (isOwner(userId) && request.resource.data.role == resource.data.role);
     }
 
-    /**
-     * @description Administrative role markers. Only Admins can modify these collections.
-     * @path /roles_admins/{userId}
-     * @allow (get) Any signed-in user can check their own admin status.
-     * @deny (write) Any non-admin user trying to grant themselves or others admin rights.
-     * @principle Administrative lockdown for core authorization metadata.
-     */
     match /roles_admins/{userId} {
-      allow get: if isSignedIn();
-      allow list: if isAdmin();
-      allow create, update, delete: if isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
-    /**
-     * @description Coordinator role markers. Managed by Admins.
-     * @path /roles_coordinators/{userId}
-     * @allow (get) Signed-in users can check status; privileged users can list.
-     * @deny (create) Non-admin users attempting to assign coordinator roles.
-     * @principle Restricted write access to authorization mapping.
-     */
     match /roles_coordinators/{userId} {
-      allow get: if isSignedIn() || isPrivileged();
-      allow list: if isPrivileged();
-      allow create, update, delete: if isAdmin();
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
-    /**
-     * @description Attendance records nested under a specific user.
-     * @path /userProfiles/{userId}/attendanceRecords/{recordId}
-     * @allow (list) The owner can list their own records; privileged users can list records for any specific user.
-     * @deny (create) If the internal userId field does not match the path userId.
-     * @principle Enforces path-based ownership and relational integrity for subcollections.
-     */
     match /userProfiles/{userId}/attendanceRecords/{recordId} {
-      allow get: if isOwner(userId) || isPrivileged();
-      allow list: if isOwner(userId) || isPrivileged();
-      
-      // On Create: User must be owner or privileged, and the data must link to the correct parent path
-      allow create: if (isOwner(userId) || isPrivileged()) && request.resource.data.userId == userId;
-      
-      // On Update: Existing owner or privileged. Relational field 'userId' is immutable.
-      allow update: if (resource != null && (isOwner(userId) || isPrivileged())) && request.resource.data.userId == resource.data.userId;
-      
-      // On Delete: Only privileged users can delete attendance history for auditing reasons.
-      allow delete: if resource != null && isPrivileged();
+      allow read: if isPrivileged() || isOwner(userId);
+      allow create: if (isPrivileged() || isOwner(userId)) && request.resource.data.userId == userId;
+      allow update: if isPrivileged() || isOwner(userId);
+      allow delete: if isPrivileged();
+    }
+
+    // Permitir a administradores y coordinadores leer CUALQUIER registro de asistencia vía queries de grupo
+    match /{path=**}/attendanceRecords/{recordId} {
+      allow read: if isPrivileged();
     }
   }
 }

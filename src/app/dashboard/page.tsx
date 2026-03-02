@@ -1,6 +1,6 @@
 "use client";
 
-import { useAppStore } from "@/lib/store";
+import { useUser, useFirestore, useCollection, useDoc, useMemoFirebase } from "@/firebase";
 import { Navbar } from "@/components/layout/Navbar";
 import { AttendanceStats } from "@/components/dashboard/AttendanceStats";
 import { QRMarker } from "@/components/attendance/QRMarker";
@@ -8,98 +8,142 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { format } from "date-fns";
-import { MapPin, QrCode, UserCog } from "lucide-react";
+import { MapPin, QrCode, UserCog, Loader2 } from "lucide-react";
 import { AdminAttendanceSummary } from "@/components/admin/AdminAttendanceSummary";
+import { collection, doc, addDoc, serverTimestamp } from "firebase/firestore";
+import { signOut } from "firebase/auth";
+import { useAuth } from "@/firebase";
 
 export default function DashboardPage() {
-  const { user, attendance, logout, addRecord, hydrated } = useAppStore();
+  const { user, isUserLoading } = useUser();
+  const { firestore } = useFirestore();
+  const { auth } = useAuth();
   const router = useRouter();
 
+  // Profile data from Firestore
+  const profileRef = useMemoFirebase(() => 
+    user ? doc(firestore, 'userProfiles', user.uid) : null, 
+  [firestore, user]);
+  const { data: profile } = useDoc(profileRef);
+
+  // Attendance records (User's own)
+  const attendanceQuery = useMemoFirebase(() => 
+    user ? collection(firestore, 'userProfiles', user.uid, 'attendanceRecords') : null,
+  [firestore, user]);
+  const { data: attendance, isLoading: isAttendanceLoading } = useCollection(attendanceQuery);
+
   useEffect(() => {
-    if (hydrated && !user) {
+    if (!isUserLoading && !user) {
       router.push("/");
     }
-  }, [user, hydrated, router]);
+  }, [user, isUserLoading, router]);
 
-  if (!hydrated || !user) return null;
+  if (isUserLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  const userRecords = attendance.filter(a => a.userId === user.id);
-  const recentRecords = user.role === 'teacher' ? userRecords : attendance;
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push("/");
+  };
+
+  const handleMarkAttendance = async (type: 'entry' | 'exit', location?: { latitude: number, longitude: number }) => {
+    if (!user) return;
+    const recordsRef = collection(firestore, 'userProfiles', user.uid, 'attendanceRecords');
+    await addDoc(recordsRef, {
+      userId: user.uid,
+      userName: user.displayName || profile?.firstName || "Usuario",
+      date: format(new Date(), 'yyyy-MM-dd'),
+      time: format(new Date(), 'HH:mm'),
+      type,
+      method: 'qr',
+      location,
+      createdAt: serverTimestamp()
+    });
+  };
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'coordinator';
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar user={user} onLogout={logout} />
+      <Navbar user={{ 
+        id: user.uid, 
+        name: user.displayName || profile?.firstName || "Usuario", 
+        role: profile?.role || 'teacher',
+        email: user.email || ""
+      }} onLogout={handleLogout} />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-              Hola, <span className="text-primary">{user.name.split(' ')[0]}</span>
+              Hola, <span className="text-primary">{(user.displayName || profile?.firstName || "Docente").split(' ')[0]}</span>
             </h1>
             <p className="text-muted-foreground">Resumen de actividad para hoy, {format(new Date(), 'dd MMMM yyyy')}</p>
           </div>
           <Badge variant="secondary" className="w-fit h-fit px-4 py-1 text-sm">
-            Estado: <span className="ml-1 text-green-600 font-bold">Activo</span>
+            Estado: <span className="ml-1 text-green-600 font-bold">Conectado</span>
           </Badge>
         </header>
 
         <AttendanceStats />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Main Action Area */}
           <div className="lg:col-span-4 space-y-6">
-            {user.role === 'teacher' ? (
-              <QRMarker onMark={(type, location) => {
-                addRecord({
-                  userId: user.id,
-                  userName: user.name,
-                  date: format(new Date(), 'yyyy-MM-dd'),
-                  time: format(new Date(), 'HH:mm'),
-                  type,
-                  method: 'qr',
-                  location
-                });
-              }} />
+            {!isAdmin ? (
+              <QRMarker onMark={handleMarkAttendance} />
             ) : (
               <Card className="border-none shadow-lg">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-lg">
                     <UserCog className="h-5 w-5 text-primary" />
                     Panel de Gestión
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-sm text-muted-foreground">
-                    Como {user.role}, puedes supervisar todos los registros y generar reportes administrativos.
+                    Como {profile?.role}, tienes visibilidad de todos los registros del campus.
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                      <div className="p-4 bg-muted rounded-xl text-center">
-                        <p className="text-2xl font-bold">{attendance.filter(a => a.date === format(new Date(), 'yyyy-MM-dd')).length}</p>
-                        <p className="text-[10px] uppercase text-muted-foreground">Hoy</p>
+                        <p className="text-2xl font-bold">{attendance?.length || 0}</p>
+                        <p className="text-[10px] uppercase text-muted-foreground">Tus Registros</p>
                      </div>
                      <div className="p-4 bg-muted rounded-xl text-center">
-                        <p className="text-2xl font-bold">{new Set(attendance.map(a => a.userId)).size}</p>
-                        <p className="text-[10px] uppercase text-muted-foreground">Usuarios</p>
+                        <p className="text-2xl font-bold">1</p>
+                        <p className="text-[10px] uppercase text-muted-foreground">Sedes</p>
                      </div>
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {(user.role === 'admin' || user.role === 'coordinator') && (
-              <AdminAttendanceSummary attendance={attendance} />
+            {isAdmin && attendance && (
+              <AdminAttendanceSummary attendance={attendance.map(a => ({
+                id: a.id,
+                userId: a.userId,
+                userName: a.userName,
+                date: a.date,
+                time: a.time,
+                type: a.type,
+                method: a.method,
+                location: a.location
+              }))} />
             )}
           </div>
 
-          {/* History / List Area */}
           <div className="lg:col-span-8">
             <Card className="border-none shadow-xl h-full">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle>Registros Recientes</CardTitle>
-                  <CardDescription>Visualización de los últimos movimientos</CardDescription>
+                  <CardTitle>Historial Reciente</CardTitle>
+                  <CardDescription>Datos reales extraídos de Firestore</CardDescription>
                 </div>
               </CardHeader>
               <CardContent>
@@ -107,14 +151,13 @@ export default function DashboardPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Fecha / Hora</TableHead>
-                      {user.role !== 'teacher' && <TableHead>Docente</TableHead>}
                       <TableHead>Tipo</TableHead>
                       <TableHead>Método</TableHead>
                       <TableHead className="text-right">Detalles</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {recentRecords.slice(0, 8).map((record) => (
+                    {attendance?.slice(0, 10).map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>
                           <div className="flex flex-col">
@@ -122,7 +165,6 @@ export default function DashboardPage() {
                             <span className="text-xs text-muted-foreground">{record.time}</span>
                           </div>
                         </TableCell>
-                        {user.role !== 'teacher' && <TableCell>{record.userName}</TableCell>}
                         <TableCell>
                           <Badge variant={record.type === 'entry' ? 'default' : 'outline'} className={record.type === 'entry' ? "bg-green-500 hover:bg-green-600" : ""}>
                             {record.type === 'entry' ? 'Entrada' : 'Salida'}
@@ -138,16 +180,23 @@ export default function DashboardPage() {
                           {record.location && (
                             <div className="flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
                               <MapPin className="h-2 w-2" />
-                              GPS OK
+                              {record.location.latitude.toFixed(2)}, {record.location.longitude.toFixed(2)}
                             </div>
                           )}
                         </TableCell>
                       </TableRow>
                     ))}
-                    {recentRecords.length === 0 && (
+                    {(!attendance || attendance.length === 0) && !isAttendanceLoading && (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          No hay registros encontrados.
+                        <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
+                          No hay registros de asistencia en la base de datos.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {isAttendanceLoading && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-12">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                         </TableCell>
                       </TableRow>
                     )}
