@@ -5,11 +5,11 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useFirebase } from "@/firebase";
 import { doc, getDoc, collection, query, where, getDocs, addDoc, setDoc, serverTimestamp, limit } from "firebase/firestore";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { Html5Qrcode } from "html5-qrcode";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { QrCode, Loader2, CheckCircle2, XCircle, Clock, MapPin, ArrowLeft } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { QrCode, Loader2, CheckCircle2, XCircle, Clock, MapPin, ArrowLeft, Camera } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -17,31 +17,66 @@ import Link from "next/link";
 export default function PublicScanPage() {
   const { firestore } = useFirebase();
   const { toast } = useToast();
-  const [scanning, setScanning] = useState(true);
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   useEffect(() => {
-    if (scanning && !scannerRef.current) {
-      const scanner = new Html5QrcodeScanner(
-        "reader",
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        /* verbose= */ false
-      );
-
-      scanner.render(onScanSuccess, onScanFailure);
-      scannerRef.current = scanner;
-    }
-
-    return () => {
-      if (scannerRef.current) {
-        scannerRef.current.clear().catch(console.error);
-        scannerRef.current = null;
+    const checkPermissions = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        setHasCameraPermission(true);
+        stream.getTracks().forEach(track => track.stop());
+        startScanner();
+      } catch (err) {
+        console.error("Error accessing camera:", err);
+        setHasCameraPermission(false);
       }
     };
-  }, [scanning]);
+
+    checkPermissions();
+
+    return () => {
+      stopScanner();
+    };
+  }, []);
+
+  const startScanner = async () => {
+    if (scannerRef.current) return;
+
+    try {
+      const html5QrCode = new Html5Qrcode("reader");
+      scannerRef.current = html5QrCode;
+      setIsScanning(true);
+
+      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+      
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        onScanSuccess,
+        onScanFailure
+      );
+    } catch (err) {
+      console.error("Failed to start scanner:", err);
+      setIsScanning(false);
+    }
+  };
+
+  const stopScanner = async () => {
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current = null;
+        setIsScanning(false);
+      } catch (err) {
+        console.error("Failed to stop scanner:", err);
+      }
+    }
+  };
 
   async function onScanSuccess(decodedText: string) {
     if (processing) return;
@@ -52,7 +87,6 @@ export default function PublicScanPage() {
       const data = JSON.parse(decodedText);
       if (!data.id) throw new Error("QR inválido: No se encontró ID del docente.");
 
-      // 1. Fetch Teacher Profile
       const teacherRef = doc(firestore, 'userProfiles', data.id);
       const teacherSnap = await getDoc(teacherRef);
 
@@ -65,21 +99,18 @@ export default function PublicScanPage() {
       const currentDay = now.getDay();
       const todayStr = format(now, 'yyyy-MM-dd');
 
-      // 2. Fetch Teacher Shifts
       const shifts: any[] = [];
       for (const sid of (teacher.shiftIds || [])) {
         const sSnap = await getDoc(doc(firestore, 'shifts', sid));
         if (sSnap.exists()) shifts.push({ ...sSnap.data(), id: sSnap.id });
       }
 
-      // 3. Find applicable shift for today
       const todayShift = shifts.find(s => s.days?.includes(currentDay));
 
       if (!todayShift) {
-        throw new Error(`El docente no tiene jornadas programadas para hoy (${format(now, 'EEEE')}).`);
+        throw new Error(`Sin jornadas programadas para hoy (${format(now, 'EEEE')}).`);
       }
 
-      // 4. Mark Attendance
       const recordsRef = collection(firestore, 'userProfiles', teacher.id, 'attendanceRecords');
       const todayQuery = query(recordsRef, where('date', '==', todayStr), where('shiftId', '==', todayShift.id), limit(1));
       const querySnapshot = await getDocs(todayQuery);
@@ -93,7 +124,6 @@ export default function PublicScanPage() {
       };
 
       if (querySnapshot.empty) {
-        // Create Entry
         attendanceData.entryDateTime = now.toISOString();
         attendanceData.entryMethod = 'qr-public';
         attendanceData.createdAt = serverTimestamp();
@@ -102,9 +132,8 @@ export default function PublicScanPage() {
       } else {
         const existingRecord = querySnapshot.docs[0].data();
         if (existingRecord.exitDateTime) {
-          throw new Error("Ya se ha registrado la salida para esta jornada hoy.");
+          throw new Error("Salida ya registrada hoy.");
         }
-        // Update Exit
         attendanceData.exitDateTime = now.toISOString();
         attendanceData.exitMethod = 'qr-public';
         await setDoc(doc(recordsRef, querySnapshot.docs[0].id), attendanceData, { merge: true });
@@ -118,13 +147,12 @@ export default function PublicScanPage() {
         status
       });
 
-      toast({ title: status, description: `${teacher.firstName} ${teacher.lastName} - ${todayShift.name}` });
+      toast({ title: status });
 
-      // Reset scanner after 5 seconds
       setTimeout(() => {
         setLastResult(null);
         setProcessing(false);
-      }, 5000);
+      }, 4000);
 
     } catch (err: any) {
       setError(err.message || "Error al procesar el código.");
@@ -133,8 +161,8 @@ export default function PublicScanPage() {
     }
   }
 
-  function onScanFailure(error: any) {
-    // Silently handle scan failures (usually just "no QR found in frame")
+  function onScanFailure() {
+    // Escaneo continuo sin errores en consola
   }
 
   return (
@@ -157,18 +185,28 @@ export default function PublicScanPage() {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-          <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white">
+          <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white relative">
             <CardHeader className="bg-primary text-white p-6">
               <CardTitle className="text-sm flex items-center gap-2">
-                <QrCode className="h-4 w-4" /> ESCÁNER ACTIVO
+                <Camera className="h-4 w-4" /> CÁMARA EN VIVO
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <div id="reader" className="w-full"></div>
-              {processing && !lastResult && !error && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
-                  <Loader2 className="h-10 w-10 text-primary animate-spin" />
-                  <p className="text-xs font-black text-primary uppercase">Procesando Identidad...</p>
+            <CardContent className="p-0 bg-slate-900 aspect-square flex items-center justify-center overflow-hidden">
+              <div id="reader" className="w-full h-full"></div>
+              
+              {hasCameraPermission === false && (
+                <div className="p-6 text-center">
+                  <Alert variant="destructive">
+                    <AlertTitle>Acceso Denegado</AlertTitle>
+                    <AlertDescription>Por favor, permite el acceso a la cámara en los ajustes de tu navegador.</AlertDescription>
+                  </Alert>
+                </div>
+              )}
+
+              {processing && (
+                <div className="absolute inset-0 bg-white/60 backdrop-blur-md flex flex-col items-center justify-center gap-4 z-20">
+                  <Loader2 className="h-12 w-12 text-primary animate-spin" />
+                  <p className="text-xs font-black text-primary uppercase tracking-widest">Validando...</p>
                 </div>
               )}
             </CardContent>
@@ -204,7 +242,7 @@ export default function PublicScanPage() {
                     <XCircle className="h-10 w-10" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-red-900 uppercase tracking-tight">ERROR DE MARCAJE</h3>
+                    <h3 className="text-xl font-black text-red-900 uppercase tracking-tight">ERROR DE LECTURA</h3>
                     <p className="text-xs font-bold text-red-700 mt-2 leading-relaxed">{error}</p>
                   </div>
                 </CardContent>
@@ -212,20 +250,17 @@ export default function PublicScanPage() {
             ) : (
               <Card className="border-none shadow-xl bg-white rounded-3xl">
                 <CardHeader>
-                  <CardTitle className="text-md font-black uppercase text-slate-800">Instrucciones</CardTitle>
+                  <CardTitle className="text-md font-black uppercase text-slate-800 tracking-tight">Punto de Marcaje</CardTitle>
+                  <CardDescription>Escanee su carnet institucional aquí.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500">1</div>
-                    <p className="text-xs text-slate-600 leading-relaxed">Presente el código QR de su <b>Carnet Digital</b> frente a la cámara.</p>
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">1</div>
+                    <p className="text-xs text-slate-600">Muestre su <b>Código QR</b> a la cámara.</p>
                   </div>
                   <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500">2</div>
-                    <p className="text-xs text-slate-600 leading-relaxed">Asegúrese de que el brillo de su celular sea alto para una lectura óptima.</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500">3</div>
-                    <p className="text-xs text-slate-600 leading-relaxed">El sistema registrará su <b>entrada</b> o <b>salida</b> según su horario actual.</p>
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">2</div>
+                    <p className="text-xs text-slate-600">Aumente el brillo de su dispositivo móvil.</p>
                   </div>
                 </CardContent>
               </Card>
@@ -233,7 +268,7 @@ export default function PublicScanPage() {
 
             <div className="flex flex-col gap-3">
               <Link href="/" className="w-full">
-                <Button variant="outline" className="w-full h-12 gap-2 font-bold rounded-2xl border-slate-200">
+                <Button variant="outline" className="w-full h-12 gap-2 font-black uppercase tracking-widest rounded-2xl border-slate-200">
                   <ArrowLeft className="h-4 w-4" /> Volver al Inicio
                 </Button>
               </Link>
