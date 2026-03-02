@@ -4,7 +4,7 @@
     "UserProfile": {
       "title": "UserProfile",
       "type": "object",
-      "description": "Perfil del usuario con su rol y jornada asignada.",
+      "description": "Perfil del usuario con su rol y jornadas asignadas.",
       "properties": {
         "id": { "type": "string" },
         "firebaseAuthUid": { "type": "string" },
@@ -12,7 +12,11 @@
         "firstName": { "type": "string" },
         "lastName": { "type": "string" },
         "role": { "type": "string", "enum": ["admin", "coordinator", "teacher"] },
-        "shiftId": { "type": "string", "description": "ID de la jornada asignada" },
+        "shiftIds": { 
+          "type": "array", 
+          "items": { "type": "string" },
+          "description": "IDs de las jornadas asignadas" 
+        },
         "isActive": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" }
       },

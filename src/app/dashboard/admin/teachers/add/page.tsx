@@ -7,10 +7,10 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UserPlus, ArrowLeft, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { UserPlus, ArrowLeft, Loader2, Clock } from "lucide-react";
 import { useState } from "react";
-import { collection, setDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, setDoc, doc } from "firebase/firestore";
 import { useMemoFirebase } from "@/firebase/provider";
 import { useToast } from "@/hooks/use-toast";
 import { signOut } from "firebase/auth";
@@ -25,18 +25,28 @@ export default function AddTeacherPage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [shiftId, setShiftId] = useState("");
+  const [selectedShiftIds, setSelectedShiftIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const shiftsQuery = useMemoFirebase(() => collection(firestore, 'shifts'), [firestore]);
-  const { data: shifts } = useCollection(shiftsQuery);
+  const { data: shifts, isLoading: isLoadingShifts } = useCollection(shiftsQuery);
+
+  const toggleShift = (shiftId: string) => {
+    setSelectedShiftIds(prev => 
+      prev.includes(shiftId) 
+        ? prev.filter(id => id !== shiftId) 
+        : [...prev, shiftId]
+    );
+  };
 
   const handleCreateTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedShiftIds.length === 0) {
+      toast({ variant: "destructive", title: "Atención", description: "Debe asignar al menos una jornada." });
+      return;
+    }
+
     setLoading(true);
-    
-    // Generar un ID temporal para el perfil. 
-    // Nota: En producción, el docente debería registrarse vía Auth y el admin solo crear el perfil previo.
     const tempId = `teacher_${Date.now()}`;
     const teacherRef = doc(firestore, 'userProfiles', tempId);
     
@@ -46,14 +56,14 @@ export default function AddTeacherPage() {
       firstName,
       lastName,
       role: 'teacher',
-      shiftId,
+      shiftIds: selectedShiftIds,
       isActive: true,
       createdAt: new Date().toISOString()
     };
 
     try {
       await setDoc(teacherRef, profileData);
-      toast({ title: "Docente registrado", description: "El perfil ha sido creado correctamente." });
+      toast({ title: "Docente registrado", description: "El perfil ha sido creado con sus jornadas asignadas." });
       router.push("/dashboard/admin/teachers");
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "No se pudo registrar al docente." });
@@ -86,7 +96,7 @@ export default function AddTeacherPage() {
             <CardHeader className="bg-white border-b border-slate-50">
               <CardTitle className="text-lg">Información del Docente</CardTitle>
             </CardHeader>
-            <CardContent className="p-8 space-y-4">
+            <CardContent className="p-8 space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Nombre(s)</Label>
@@ -101,18 +111,50 @@ export default function AddTeacherPage() {
                 <Label>Correo Institucional</Label>
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
-              <div className="space-y-2">
-                <Label>Asignar Jornada (Horario)</Label>
-                <Select value={shiftId} onValueChange={setShiftId} required>
-                  <SelectTrigger className="bg-slate-50 border-none shadow-inner">
-                    <SelectValue placeholder="Seleccione una jornada" />
-                  </SelectTrigger>
-                  <SelectContent>
+              
+              <div className="space-y-4">
+                <Label className="text-sm font-bold text-slate-700">Asignar Jornadas (Horarios)</Label>
+                {isLoadingShifts ? (
+                  <div className="flex items-center gap-2 text-muted-foreground italic text-xs">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Cargando jornadas...
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2">
                     {shifts?.map(shift => (
-                      <SelectItem key={shift.id} value={shift.id}>{shift.name} ({shift.startTime} - {shift.endTime})</SelectItem>
+                      <div 
+                        key={shift.id} 
+                        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                          selectedShiftIds.includes(shift.id) 
+                            ? 'bg-primary/5 border-primary shadow-sm' 
+                            : 'bg-slate-50 border-transparent hover:border-slate-200'
+                        }`}
+                        onClick={() => toggleShift(shift.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Checkbox 
+                            checked={selectedShiftIds.includes(shift.id)}
+                            onCheckedChange={() => toggleShift(shift.id)}
+                          />
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">{shift.name}</p>
+                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-medium">
+                              <Clock className="h-2.5 w-2.5" />
+                              {shift.startTime} - {shift.endTime}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-[10px] bg-white px-2 py-1 rounded-md border text-muted-foreground font-bold">
+                          {shift.tolerance}m Tol.
+                        </div>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
+                    {shifts?.length === 0 && (
+                      <p className="text-sm text-orange-500 bg-orange-50 p-4 rounded-xl border border-orange-100">
+                        No hay jornadas configuradas. Vaya a "Jornadas" primero.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
             <CardFooter className="bg-slate-50 p-6 flex justify-end">

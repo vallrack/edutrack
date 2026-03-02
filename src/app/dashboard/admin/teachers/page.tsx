@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { GraduationCap, Search, Loader2, History, UserPlus } from "lucide-react";
+import { GraduationCap, Search, Loader2, History, UserPlus, Clock } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
@@ -26,18 +26,18 @@ export default function TeachersAdminPage() {
   const [search, setSearch] = useState("");
   const { toast } = useToast();
 
-  // Fetch current user profile for Navbar
   const profileRef = useMemoFirebase(() => 
     user ? doc(firestore, 'userProfiles', user.uid) : null, 
   [firestore, user]);
   const { data: profile } = useDoc(profileRef);
 
-  // Fetch all user profiles that are teachers
   const teachersQuery = useMemoFirebase(() => 
     query(collection(firestore, 'userProfiles'), where('role', '==', 'teacher')),
   [firestore]);
-  
   const { data: teachers, isLoading } = useCollection(teachersQuery);
+
+  const shiftsQuery = useMemoFirebase(() => collection(firestore, 'shifts'), [firestore]);
+  const { data: shifts } = useCollection(shiftsQuery);
 
   const filteredTeachers = useMemo(() => {
     if (!teachers) return [];
@@ -81,6 +81,14 @@ export default function TeachersAdminPage() {
           requestResourceData: attendanceData,
         }));
       });
+  };
+
+  const getShiftNames = (shiftIds?: string[]) => {
+    if (!shiftIds || !shifts) return "Sin jornadas";
+    return shiftIds
+      .map(id => shifts.find(s => s.id === id)?.name)
+      .filter(Boolean)
+      .join(", ");
   };
 
   return (
@@ -131,8 +139,8 @@ export default function TeachersAdminPage() {
                 <TableHeader className="bg-slate-50/50">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Nombre</TableHead>
-                    <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Email</TableHead>
-                    <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] tracking-wider text-center">Marcar Jornada (Hoy)</TableHead>
+                    <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] tracking-wider">Jornadas</TableHead>
+                    <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] tracking-wider text-center">Marcar Jornada</TableHead>
                     <TableHead className="py-4 px-6 font-bold text-slate-500 uppercase text-[10px] tracking-wider text-right">Acción</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -144,10 +152,18 @@ export default function TeachersAdminPage() {
                           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold">
                             {teacher.firstName[0]}{teacher.lastName[0]}
                           </div>
-                          <span className="font-semibold text-slate-700">{teacher.firstName} {teacher.lastName}</span>
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-slate-700">{teacher.firstName} {teacher.lastName}</span>
+                            <span className="text-[10px] text-muted-foreground">{teacher.email}</span>
+                          </div>
                         </div>
                       </TableCell>
-                      <TableCell className="py-4 px-6 text-muted-foreground">{teacher.email}</TableCell>
+                      <TableCell className="py-4 px-6">
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+                          <Clock className="h-3 w-3 text-primary" />
+                          {getShiftNames(teacher.shiftIds)}
+                        </div>
+                      </TableCell>
                       <TableCell className="py-4 px-6 text-center">
                         <Checkbox 
                           onCheckedChange={(checked) => checked && handleManualMark(teacher)}
