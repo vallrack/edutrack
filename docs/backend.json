@@ -1,0 +1,233 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user within the EduTrack Attendance system, storing their profile details and role for access control. Authentication details (passwords) are managed by an external system (Firebase Auth).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "firebaseAuthUid": {
+          "type": "string",
+          "description": "The unique user ID provided by Firebase Authentication. This links the profile to the authentication system."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address, used for identification and communication (not for direct authentication data storage).",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The user's given name."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The user's family name."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user, determining their access level within the application.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates if the user's account is currently active."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user profile was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the user profile was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "firebaseAuthUid",
+        "email",
+        "firstName",
+        "lastName",
+        "role",
+        "isActive",
+        "createdAt"
+      ]
+    },
+    "AttendanceRecord": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AttendanceRecord",
+      "type": "object",
+      "description": "Records a specific attendance entry for a user, potentially including both clock-in and clock-out times, location data, and the method of marking. It can represent a daily work session or a manually overridden full-day attendance.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AttendanceRecord entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile who this attendance record belongs to. (Relationship: UserProfile 1:N AttendanceRecord)"
+        },
+        "date": {
+          "type": "string",
+          "description": "The calendar date (YYYY-MM-DD) for which this attendance record applies. Useful for date-based filtering.",
+          "format": "date"
+        },
+        "entryDateTime": {
+          "type": "string",
+          "description": "The timestamp when the user clocked in for this attendance session.",
+          "format": "date-time"
+        },
+        "exitDateTime": {
+          "type": "string",
+          "description": "The timestamp when the user clocked out for this attendance session. Null if the user is still clocked in or for a manual full-day override without explicit exit.",
+          "format": "date-time"
+        },
+        "entryMethod": {
+          "type": "string",
+          "description": "The method used to record the entry time (QR scan or manual entry by coordinator/admin).",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exitMethod": {
+          "type": "string",
+          "description": "The method used to record the exit time (QR scan or manual entry by coordinator/admin). Null if exit time is not recorded.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "entryLocationLatitude": {
+          "type": "number",
+          "description": "The latitude coordinate captured at the time of entry."
+        },
+        "entryLocationLongitude": {
+          "type": "number",
+          "description": "The longitude coordinate captured at the time of entry."
+        },
+        "exitLocationLatitude": {
+          "type": "number",
+          "description": "The latitude coordinate captured at the time of exit. Null if exit time is not recorded."
+        },
+        "exitLocationLongitude": {
+          "type": "number",
+          "description": "The longitude coordinate captured at the time of exit. Null if exit time is not recorded."
+        },
+        "markedByCoordinatorId": {
+          "type": "string",
+          "description": "Reference to the UserProfile ID of the coordinator or administrator who manually created or last modified this attendance record. (Relationship: UserProfile 1:N AttendanceRecord)"
+        },
+        "isManualOverride": {
+          "type": "boolean",
+          "description": "Indicates if this attendance record was created or significantly modified manually by a coordinator/administrator, overriding standard QR marking. This covers the 'Cumplió Jornada' scenario."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when this attendance record was initially created in the system.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when this attendance record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "date",
+        "entryDateTime",
+        "entryMethod",
+        "entryLocationLatitude",
+        "entryLocationLongitude",
+        "isManualOverride",
+        "createdAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/userProfiles/{firebaseAuthUid}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores individual user profiles, identified by their Firebase Auth UID. Includes the user's role for application-level access control. This collection serves as the primary source for user profile data, allowing direct owner access via `request.auth.uid` matching the document ID.",
+          "params": [
+            {
+              "name": "firebaseAuthUid",
+              "description": "The unique user ID provided by Firebase Authentication, also serving as the document ID for the UserProfile."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admins/{firebaseAuthUid}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Dedicated collection for quickly checking if a user has the 'admin' role. The document ID is the user's Firebase Auth UID. Primarily used by security rules via `exists()` to grant elevated permissions, ensuring Authorization Independence without relying on `get()` calls to the main userProfiles collection.",
+          "params": [
+            {
+              "name": "firebaseAuthUid",
+              "description": "The unique user ID provided by Firebase Authentication, also serving as the document ID for the admin role entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_coordinators/{firebaseAuthUid}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Dedicated collection for quickly checking if a user has the 'coordinator' role. The document ID is the user's Firebase Auth UID. Primarily used by security rules via `exists()` to grant elevated permissions, ensuring Authorization Independence without relying on `get()` calls to the main userProfiles collection.",
+          "params": [
+            {
+              "name": "firebaseAuthUid",
+              "description": "The unique user ID provided by Firebase Authentication, also serving as the document ID for the coordinator role entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/userProfiles/{userId}/attendanceRecords/{attendanceRecordId}",
+        "definition": {
+          "entityName": "AttendanceRecord",
+          "schema": {
+            "$ref": "#/backend/entities/AttendanceRecord"
+          },
+          "description": "Stores individual attendance records. Each record belongs to a specific user, identified by `userId` (their Firebase Auth UID). This hierarchical structure enables simple Path-Based Ownership rules for teachers and efficient queries for a single user's history. Includes `userId` and `markedByCoordinatorId` (denormalized user ID) for Authorization Independence, allowing rules to verify ownership or administrative actions directly from document data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user who owns this attendance record."
+            },
+            {
+              "name": "attendanceRecordId",
+              "description": "Unique identifier for the specific attendance record."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure prioritizes **Authorization Independence** and **Structural Segregation** to ensure robust and debuggable security rules. \n\n**Authorization Independence via Denormalization (Mandate A):**\n1.  **User Roles:** Instead of relying on a `get()` call to a user's profile to determine their role (e.g., `get(/userProfiles/$(request.auth.uid)).data.role`), dedicated top-level collections are used for global roles: `/roles_admins/{firebaseAuthUid}` and `/roles_coordinators/{firebaseAuthUid}`. Security rules can then efficiently check `exists(/databases/$(database)/documents/roles_admins/$(request.auth.uid))` without introducing hierarchical authorization dependencies. This enables atomic operations and simplifies rule logic for administrators and coordinators. The `UserProfile` document itself still stores the `role` field as the source of truth for application UI, but security rules leverage the denormalized role collections.\n2.  **Attendance Record Ownership:** Each `AttendanceRecord` document includes the `userId` field, which directly corresponds to the parent collection's `userId` wildcard (i.e., the owner's `firebaseAuthUid`). This allows teachers to access their own attendance records with a simple `request.auth.uid == resource.data.userId` check, again avoiding `get()` calls and ensuring authorization independence for user-owned data.\n3.  **Manual Overrides:** The `markedByCoordinatorId` field within `AttendanceRecord` explicitly tracks who performed a manual override, aiding auditability and allowing rules to enforce that only authorized personnel can set this field.\n\n**Structural Segregation for QAPs (Mandate B & C):**\n1.  **User Profiles:** `/userProfiles/{firebaseAuthUid}` provides a dedicated space for user-specific profile data. Access is path-based (`request.auth.uid == firebaseAuthUid`) for the owner, with broader access granted to admins and coordinators via the denormalized role collections.\n2.  **Attendance Records:** `/userProfiles/{userId}/attendanceRecords/{attendanceRecordId}` uses a hierarchical path structure, enforcing **Path-Based Ownership** (Mandate C). This ensures that a teacher can only list and manage their *own* attendance records securely (`request.auth.uid == userId`). For administrators and coordinators who need to access *all* records for reporting (RF-08, RF-09), the application design correctly leverages **Cloud Functions**, which have administrative privileges, to perform these aggregate queries. This completely avoids the anti-pattern of using security rules as filters (`QAPs`) on large client-side `list` operations, ensuring that client-side list queries within `/userProfiles/{userId}/attendanceRecords` return only authorized data (either the user's own, or for admins/coordinators, all for that specific `userId`).\n3.  **Role Collections:** `/roles_admins/{firebaseAuthUid}` and `/roles_coordinators/{firebaseAuthUid}` are segregated collections, each with a homogeneous security posture (documents within these collections indicate a specific global role). This makes role-based access checks extremely clear and performant.\n\nThis structure directly supports the design principles by offering clear ownership, explicit role-based access, and eliminating complex `get()` calls in security rules, leading to a secure, scalable, and easily debuggable Firestore implementation."
+  }
+}
