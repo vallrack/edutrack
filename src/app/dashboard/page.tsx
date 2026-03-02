@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { QrCode, UserCog, Loader2, CheckCircle2, MapPin, Sparkles, Clock } from "lucide-react";
+import { QrCode, UserCog, Loader2, CheckCircle2, MapPin, Sparkles, Clock, Calendar } from "lucide-react";
 import { AdminAttendanceSummary } from "@/components/admin/AdminAttendanceSummary";
 import { collection, doc, addDoc, serverTimestamp, query, orderBy, limit, setDoc, getDocs, where } from "firebase/firestore";
 import { signOut } from "firebase/auth";
@@ -161,6 +161,10 @@ export default function DashboardPage() {
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'coordinator';
   const todayRecords = attendance?.filter(r => r.date === format(new Date(), 'yyyy-MM-dd')) || [];
+  const currentDayOfWeek = new Date().getDay(); // 0=Domingo, 1=Lunes...
+
+  // Filtrar jornadas que corresponden al día de hoy
+  const todayShifts = profile?.shiftIds?.map((sid: string) => shifts?.find(s => s.id === sid)).filter(s => s && s.days?.includes(currentDayOfWeek)) || [];
 
   return (
     <div className="min-h-screen bg-[#F1F3F6]">
@@ -188,51 +192,48 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-4 space-y-6">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Mis Jornadas de Hoy</h2>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-500">Jornadas Disponibles para Hoy</h2>
             
-            {profile?.shiftIds?.map((shiftId: string) => {
-              const shift = shifts?.find(s => s.id === shiftId);
-              const record = todayRecords.find(r => r.shiftId === shiftId);
-              if (!shift) return null;
-
+            {todayShifts.map((shift: any) => {
+              const record = todayRecords.find(r => r.shiftId === shift.id);
               return (
-                <Card key={shiftId} className="border-none shadow-xl bg-white rounded-2xl overflow-hidden">
+                <Card key={shift.id} className="border-none shadow-xl bg-white rounded-2xl overflow-hidden">
                   <CardHeader className="bg-slate-50/50 pb-4">
                     <CardTitle className="text-md flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-primary" />
                         {shift.name}
                       </div>
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-[10px] font-bold">
                         {shift.startTime} - {shift.endTime}
                       </Badge>
                     </CardTitle>
-                    <CardDescription className="text-[10px] font-bold uppercase">
-                      Tolerancia: {shift.tolerance} min
-                    </CardDescription>
+                    <div className="flex items-center gap-2 mt-1">
+                       <Badge className="bg-primary/10 text-primary text-[8px] border-none">TOLERANCIA: {shift.tolerance}m</Badge>
+                    </div>
                   </CardHeader>
                   <CardContent className="pt-6 space-y-4">
                     <Button 
-                      onClick={() => handleFullShiftMark(shiftId)}
+                      onClick={() => handleFullShiftMark(shift.id)}
                       disabled={!!isActionLoading || (!!record?.entryDateTime && !!record?.exitDateTime)}
                       className="w-full h-12 bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 border flex items-center justify-between px-4 font-black rounded-xl text-xs"
                     >
                       <div className="flex items-center gap-2">
                         <Sparkles className="h-4 w-4" />
-                        <span>JORNADA COMPLETA</span>
+                        <span>REGISTRAR CUMPLIMIENTO TOTAL</span>
                       </div>
-                      {isActionLoading === shiftId && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {isActionLoading === shift.id && <Loader2 className="h-3 w-3 animate-spin" />}
                     </Button>
 
                     <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                       <Checkbox 
-                        id={`entry-${shiftId}`} 
+                        id={`entry-${shift.id}`} 
                         disabled={!!record?.entryDateTime || !!isActionLoading}
                         checked={!!record?.entryDateTime}
-                        onCheckedChange={(checked) => checked && handleMarkAttendance(shiftId, 'entry', 'manual')}
+                        onCheckedChange={(checked) => checked && handleMarkAttendance(shift.id, 'entry', 'manual')}
                       />
-                      <Label htmlFor={`entry-${shiftId}`} className="flex-1 cursor-pointer">
-                        <p className="font-bold text-slate-800 text-sm">Entrada</p>
+                      <Label htmlFor={`entry-${shift.id}`} className="flex-1 cursor-pointer">
+                        <p className="font-bold text-slate-800 text-sm">Entrada Manual</p>
                         <p className="text-[10px] text-muted-foreground uppercase font-bold">
                           {record?.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : 'Pendiente'}
                         </p>
@@ -241,13 +242,13 @@ export default function DashboardPage() {
 
                     <div className="flex items-center space-x-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                       <Checkbox 
-                        id={`exit-${shiftId}`} 
+                        id={`exit-${shift.id}`} 
                         disabled={!record?.entryDateTime || !!record?.exitDateTime || !!isActionLoading}
                         checked={!!record?.exitDateTime}
-                        onCheckedChange={(checked) => checked && handleMarkAttendance(shiftId, 'exit', 'manual')}
+                        onCheckedChange={(checked) => checked && handleMarkAttendance(shift.id, 'exit', 'manual')}
                       />
-                      <Label htmlFor={`exit-${shiftId}`} className="flex-1 cursor-pointer">
-                        <p className="font-bold text-slate-800 text-sm">Salida</p>
+                      <Label htmlFor={`exit-${shift.id}`} className="flex-1 cursor-pointer">
+                        <p className="font-bold text-slate-800 text-sm">Salida Manual</p>
                         <p className="text-[10px] text-muted-foreground uppercase font-bold">
                           {record?.exitDateTime ? format(new Date(record.exitDateTime), 'HH:mm') : 'Pendiente'}
                         </p>
@@ -258,18 +259,18 @@ export default function DashboardPage() {
               );
             })}
 
-            {(!profile?.shiftIds || profile.shiftIds.length === 0) && (
-              <Card className="border-dashed border-2 bg-transparent text-center p-8">
-                <p className="text-sm text-muted-foreground">No tienes jornadas asignadas para hoy.</p>
+            {todayShifts.length === 0 && (
+              <Card className="border-dashed border-2 bg-transparent text-center p-12">
+                <Calendar className="h-10 w-10 text-slate-300 mx-auto mb-4" />
+                <p className="text-sm font-medium text-slate-500">No tienes jornadas programadas para este día de la semana.</p>
               </Card>
             )}
 
             <QRMarker onMark={(type, loc) => {
-              // Si tiene una sola jornada, marcar esa. Si no, notificar.
-              if (profile?.shiftIds?.length === 1) {
-                handleMarkAttendance(profile.shiftIds[0], type, 'qr', loc);
+              if (todayShifts.length === 1) {
+                handleMarkAttendance(todayShifts[0].id, type, 'qr', loc);
               } else {
-                toast({ title: "Selección requerida", description: "Por favor usa el marcaje manual para elegir la jornada específica." });
+                toast({ title: "Selección requerida", description: "Usa el marcaje por tarjeta para seleccionar la jornada específica hoy." });
               }
             }} />
 

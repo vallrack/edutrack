@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { UserPlus, ArrowLeft, Loader2, Clock } from "lucide-react";
+import { UserPlus, ArrowLeft, Loader2, Clock, Calendar } from "lucide-react";
 import { useState } from "react";
 import { collection, setDoc, doc } from "firebase/firestore";
 import { useMemoFirebase } from "@/firebase/provider";
@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+
+const DAY_INITIALS = ["D", "L", "M", "M", "J", "V", "S"];
 
 export default function AddTeacherPage() {
   const { user, firestore, auth } = useFirebase();
@@ -113,33 +115,50 @@ export default function AddTeacherPage() {
               </div>
               
               <div className="space-y-4">
-                <Label className="text-sm font-bold text-slate-700">Asignar Jornadas (Horarios)</Label>
+                <Label className="text-sm font-bold text-slate-700">Asignar Jornadas Disponibles</Label>
                 {isLoadingShifts ? (
                   <div className="flex items-center gap-2 text-muted-foreground italic text-xs">
                     <Loader2 className="h-3 w-3 animate-spin" /> Cargando jornadas...
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-2">
+                  <div className="grid grid-cols-1 gap-3">
                     {shifts?.map(shift => (
                       <div 
                         key={shift.id} 
-                        className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                        className={`flex items-start justify-between p-4 rounded-xl border transition-all ${
                           selectedShiftIds.includes(shift.id) 
                             ? 'bg-primary/5 border-primary shadow-sm' 
                             : 'bg-slate-50 border-transparent hover:border-slate-200'
                         }`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-start gap-3">
                           <Checkbox 
                             id={`shift-${shift.id}`}
                             checked={selectedShiftIds.includes(shift.id)}
                             onCheckedChange={() => toggleShift(shift.id)}
+                            className="mt-1"
                           />
-                          <Label htmlFor={`shift-${shift.id}`} className="cursor-pointer">
-                            <p className="text-sm font-bold text-slate-800">{shift.name}</p>
-                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-medium">
-                              <Clock className="h-2.5 w-2.5" />
-                              {shift.startTime} - {shift.endTime}
+                          <Label htmlFor={`shift-${shift.id}`} className="cursor-pointer space-y-2">
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">{shift.name}</p>
+                              <div className="flex items-center gap-1 text-[10px] text-primary font-black uppercase">
+                                <Clock className="h-2.5 w-2.5" />
+                                {shift.startTime} - {shift.endTime}
+                              </div>
+                            </div>
+                            <div className="flex gap-1">
+                              {DAY_INITIALS.map((init, i) => (
+                                <span 
+                                  key={i} 
+                                  className={`text-[9px] px-1.5 py-0.5 rounded-sm font-black ${
+                                    shift.days?.includes(i) 
+                                      ? 'bg-primary text-white' 
+                                      : 'bg-white text-slate-300'
+                                  }`}
+                                >
+                                  {init}
+                                </span>
+                              ))}
                             </div>
                           </Label>
                         </div>

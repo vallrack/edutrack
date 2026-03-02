@@ -25,15 +25,19 @@
     "Shift": {
       "title": "Shift",
       "type": "object",
-      "description": "Define un horario o jornada laboral (Ej: Matutina, Vespertina).",
+      "description": "Define un horario o jornada laboral con días específicos.",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string", "description": "Nombre de la jornada (Ej: Turno Mañana)" },
         "startTime": { "type": "string", "description": "Hora de entrada (HH:mm)" },
         "endTime": { "type": "string", "description": "Hora de salida (HH:mm)" },
-        "tolerance": { "type": "number", "description": "Minutos de tolerancia para la entrada" }
+        "tolerance": { "type": "number", "description": "Minutos de tolerancia para la entrada" },
+        "days": {
+          "type": "array",
+          "items": { "type": "number", "description": "0=Domingo, 1=Lunes, ..., 6=Sábado" }
+        }
       },
-      "required": ["id", "name", "startTime", "endTime"]
+      "required": ["id", "name", "startTime", "endTime", "days"]
     }
   },
   "auth": {

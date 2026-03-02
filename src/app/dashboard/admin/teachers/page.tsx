@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, History, UserPlus, Pencil, Trash2, CheckCircle2 } from "lucide-react";
+import { Search, Loader2, History, UserPlus, Pencil, Trash2, CheckCircle2, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +28,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+
+const DAY_INITIALS = ["D", "L", "M", "M", "J", "V", "S"];
 
 export default function TeachersAdminPage() {
   const { user, firestore, auth } = useFirebase();
@@ -174,13 +176,23 @@ export default function TeachersAdminPage() {
                         </div>
                       </TableCell>
                       <TableCell className="py-4 px-6">
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-col gap-2">
                           {teacher.shiftIds?.map((sid: string) => {
                             const s = shifts?.find(x => x.id === sid);
                             return s ? (
-                              <Badge key={sid} variant="secondary" className="text-[8px] bg-slate-100">
-                                {s.name} ({s.startTime})
-                              </Badge>
+                              <div key={sid} className="flex flex-col gap-0.5 border-l-2 border-primary/20 pl-2">
+                                <span className="text-[10px] font-bold text-slate-700">{s.name}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[9px] text-primary font-bold">{s.startTime}-{s.endTime}</span>
+                                  <div className="flex gap-0.5">
+                                    {DAY_INITIALS.map((init, i) => (
+                                      <span key={i} className={`text-[8px] font-black ${s.days?.includes(i) ? 'text-primary' : 'text-slate-200'}`}>
+                                        {init}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
                             ) : null;
                           })}
                         </div>
@@ -192,7 +204,7 @@ export default function TeachersAdminPage() {
                               <CheckCircle2 className="h-4 w-4" /> Marcar Jornada
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-56 p-2 space-y-1">
+                          <PopoverContent className="w-64 p-2 space-y-1">
                             <p className="text-[10px] font-black uppercase text-slate-400 px-2 py-1">Selecciona Jornada</p>
                             {teacher.shiftIds?.map((sid: string) => {
                               const s = shifts?.find(x => x.id === sid);
@@ -200,10 +212,14 @@ export default function TeachersAdminPage() {
                                 <Button 
                                   key={sid} 
                                   variant="ghost" 
-                                  className="w-full justify-start h-9 text-xs"
+                                  className="w-full justify-between h-11 px-2 text-[11px]"
                                   onClick={() => handleManualShiftMark(teacher, sid)}
                                 >
-                                  {s.name}
+                                  <div className="text-left">
+                                    <p className="font-bold">{s.name}</p>
+                                    <p className="text-[9px] text-muted-foreground">{s.startTime}-{s.endTime}</p>
+                                  </div>
+                                  <CheckCircle2 className="h-4 w-4 opacity-20" />
                                 </Button>
                               ) : null;
                             })}
