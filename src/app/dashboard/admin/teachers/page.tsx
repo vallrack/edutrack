@@ -66,9 +66,14 @@ export default function TeachersAdminPage() {
   const handleDeleteTeacher = async (id: string) => {
     try {
       await deleteDoc(doc(firestore, 'userProfiles', id));
-      toast({ title: "Docente eliminado" });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error" });
+      toast({ title: "Docente eliminado", description: "El perfil ha sido removido del sistema." });
+    } catch (error: any) {
+      console.error(error);
+      toast({ 
+        variant: "destructive", 
+        title: "Error al eliminar", 
+        description: "No tienes permisos suficientes o el docente ya no existe." 
+      });
     }
   };
 
@@ -241,11 +246,13 @@ export default function TeachersAdminPage() {
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>¿Eliminar docente?</AlertDialogTitle>
-                                <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+                                <AlertDialogDescription>Esta acción no se puede deshacer y borrará permanentemente el perfil del docente.</AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.id)}>Confirmar</AlertDialogAction>
+                                <AlertDialogAction onClick={() => handleDeleteTeacher(teacher.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                  Confirmar Eliminación
+                                </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
@@ -253,6 +260,13 @@ export default function TeachersAdminPage() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {(!filteredTeachers || filteredTeachers.length === 0) && !isLoading && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-20 text-muted-foreground italic">
+                        No se encontraron docentes para mostrar.
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             )}

@@ -10,8 +10,12 @@ service cloud.firestore {
 
     match /userProfiles/{userId} {
       allow read: if isPrivileged() || request.auth.uid == userId;
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isPrivileged() || (request.auth.uid == userId && request.resource.data.role == resource.data.role);
+      // Permite crear si es admin o si el usuario se está registrando a sí mismo
+      allow create: if isPrivileged() || (isSignedIn() && request.auth.uid == userId);
+      // Permite actualizar si es admin/coord o si el usuario edita su propio perfil (sin cambiar su rol)
+      allow update: if isPrivileged() || (isSignedIn() && request.auth.uid == userId && (request.resource.data.role == resource.data.role || !('role' in request.resource.data)));
+      // Permite eliminar solo a administradores
+      allow delete: if isAdmin();
     }
 
     match /roles_admins/{userId} {
