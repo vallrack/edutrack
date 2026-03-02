@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useFirebase, useCollection, useDoc } from "@/firebase";
+import { useFirebase, useCollection, useDoc, useUser } from "@/firebase";
 import { Navbar } from "@/components/layout/Navbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,8 @@ import { TeacherCardQR } from "@/components/attendance/TeacherCardQR";
 const DAY_INITIALS = ["D", "L", "M", "M", "J", "V", "S"];
 
 export default function TeachersAdminPage() {
-  const { user, firestore, auth } = useFirebase();
+  const { firestore, auth } = useFirebase();
+  const { user, isUserLoading: isAuthLoading } = useUser();
   const router = useRouter();
   const [search, setSearch] = useState("");
   const { toast } = useToast();
@@ -49,7 +50,7 @@ export default function TeachersAdminPage() {
   const profileRef = useMemoFirebase(() => 
     user ? doc(firestore, 'userProfiles', user.uid) : null, 
   [firestore, user]);
-  const { data: profile } = useDoc(profileRef);
+  const { data: profile, isLoading: isProfileLoading } = useDoc(profileRef);
 
   const teachersQuery = useMemoFirebase(() => {
     if (!user) return null;
@@ -91,7 +92,7 @@ export default function TeachersAdminPage() {
     const shift = shifts?.find(s => s.id === shiftId);
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     
-    if (!shift) return;
+    if (!shift || !user) return;
 
     const recordsRef = collection(firestore, 'userProfiles', teacher.id, 'attendanceRecords');
     const todayQuery = query(recordsRef, where('date', '==', todayStr), where('shiftId', '==', shiftId), limit(1));
@@ -108,7 +109,7 @@ export default function TeachersAdminPage() {
       exitDateTime,
       entryMethod: 'manual',
       exitMethod: 'manual',
-      markedByCoordinatorId: user?.uid,
+      markedByCoordinatorId: user.uid,
       isManualOverride: true,
       updatedAt: serverTimestamp()
     };
@@ -128,14 +129,22 @@ export default function TeachersAdminPage() {
     }
   };
 
+  // Improved navbar data construction
+  const navbarUser = profile ? {
+    id: profile.id,
+    name: `${profile.firstName} ${profile.lastName}`,
+    role: profile.role,
+    email: profile.email
+  } : user ? {
+    id: user.uid,
+    name: user.displayName || 'Usuario',
+    role: 'admin' as any, // Fallback to admin if we're on this page
+    email: user.email || ''
+  } : null;
+
   return (
     <div className="min-h-screen bg-[#F1F3F6]">
-      <Navbar user={profile ? { 
-        id: profile.id, 
-        name: `${profile.firstName} ${profile.lastName}`, 
-        role: profile.role,
-        email: profile.email
-      } : null} onLogout={handleLogout} />
+      <Navbar user={navbarUser} onLogout={handleLogout} />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6 md:space-y-8">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -154,7 +163,7 @@ export default function TeachersAdminPage() {
               />
             </div>
             <Link href="/dashboard/admin/teachers/add" className="w-full sm:w-auto">
-              <Button className="h-11 w-full sm:w-auto gap-2 font-bold shadow-lg rounded-xl">
+              <Button className="h-11 w-full sm:w-auto gap-2 font-black uppercase tracking-widest shadow-xl rounded-xl">
                 <UserPlus className="h-4 w-4" />
                 Nuevo Docente
               </Button>
