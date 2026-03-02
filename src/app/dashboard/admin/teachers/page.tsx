@@ -13,7 +13,7 @@ import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, addDoc, serverTimestamp, doc, deleteDoc, getDocs, limit, setDoc } from "firebase/firestore";
 import { useMemoFirebase } from "@/firebase/provider";
-import Link from "next/link";
+import Link from "link";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import {
@@ -51,9 +51,10 @@ export default function TeachersAdminPage() {
   [firestore, user]);
   const { data: profile } = useDoc(profileRef);
 
-  const teachersQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'userProfiles'), where('role', '==', 'teacher')),
-  [firestore]);
+  const teachersQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(collection(firestore, 'userProfiles'), where('role', '==', 'teacher'));
+  }, [firestore, user]);
   const { data: teachers, isLoading } = useCollection(teachersQuery);
 
   const shiftsQuery = useMemoFirebase(() => collection(firestore, 'shifts'), [firestore]);
