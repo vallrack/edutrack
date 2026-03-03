@@ -1,147 +1,165 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { QrCode, Scan, CheckCircle2, MapPin, Loader2, Camera, X } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { Html5Qrcode } from "html5-qrcode";
+import { Button } from "@/components/ui/button";
+import { QrCode, Camera, X, Loader2, Upload, AlertCircle } from 'lucide-react';
+import { Html5Qrcode, Html5QrcodeError, Html5QrcodeResult } from "html5-qrcode";
+import { useToast } from '@/hooks/use-toast';
 
 interface QRMarkerProps {
-  onMark: (type: 'entry' | 'exit', location?: { latitude: number, longitude: number }) => void;
+    onMark: (decodedText: string) => void;
 }
 
-export function QRMarker({ onMark }: QRMarkerProps) {
-  const [isScanning, setIsScanning] = useState(false);
-  const [isMarked, setIsMarked] = useState(false);
-  const [location, setLocation] = useState<{ latitude: number, longitude: number } | null>(null);
-  const [showScanner, setShowScanner] = useState(false);
-  const { toast } = useToast();
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+export const QRMarker: React.FC<QRMarkerProps> = ({ onMark }) => {
+    const { toast } = useToast();
+    const [isScanning, setIsScanning] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const scannerRef = useRef<Html5Qrcode | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const readerId = "reader-institutional";
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-        () => toast({ variant: "destructive", title: "GPS Desactivado", description: "Es necesario activar la ubicación." })
-      );
-    }
+    useEffect(() => {
+        // This effect runs once on mount to initialize the scanner.
+        if (typeof window !== 'undefined' && !scannerRef.current) {
+            scannerRef.current = new Html5Qrcode(readerId, { verbose: false });
+        }
 
-    return () => {
-      stopScanner();
+        return () => {
+            // Cleanup on unmount.
+            if (scannerRef.current?.isScanning) {
+                scannerRef.current.stop().catch(() => {});
+            }
+        };
+    }, []);
+
+    const stopScanner = useCallback(() => {
+        if (scannerRef.current?.isScanning) {
+            scannerRef.current.stop()
+                .then(() => setIsScanning(false))
+                .catch(() => setIsScanning(false));
+        } else {
+            setIsScanning(false);
+        }
+    }, []);
+
+    const onScanSuccess = useCallback((decodedText: string) => {
+        stopScanner();
+        onMark(decodedText);
+        toast({
+            title: "¡QR Escaneado!",
+            description: "El registro de asistencia ha sido validado.",
+            className: "bg-green-100 border-green-300 text-green-800",
+        });
+    }, [stopScanner, onMark, toast]);
+    
+    const onScanFailure = (errorMessage: string) => {
+        // This callback is called frequently, so we don't want to spam the state or console.
+        // We can add more sophisticated error handling here if needed.
     };
-  }, []);
 
-  const startScanner = async () => {
-    if (!location) {
-      toast({ variant: "destructive", title: "Ubicación requerida", description: "Esperando señal GPS..." });
-      return;
-    }
+    const startScanner = async () => {
+        setError(null);
+        setIsScanning(true);
 
-    setShowScanner(true);
-    setTimeout(async () => {
-      try {
-        const html5QrCode = new Html5Qrcode("dashboard-scanner");
-        scannerRef.current = html5QrCode;
+        // Check for camera permissions
+        try {
+            const devices = await Html5Qrcode.getCameras();
+            if (!devices || devices.length === 0) {
+                throw new Error("No cameras found.");
+            }
+        } catch(err) {
+            setError("No se encontró ninguna cámara. Conecta una o revisa los permisos.");
+            setIsScanning(false);
+            return;
+        }
+
+        if (!scannerRef.current) return;
         
-        await html5QrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 200, height: 200 } },
-          (decodedText) => {
-            stopScanner();
-            handleScanSuccess(decodedText);
-          },
-          () => {}
-        );
-      } catch (err) {
-        console.error("Scanner error:", err);
-        setShowScanner(false);
-        toast({ variant: "destructive", title: "Error de cámara", description: "No se pudo iniciar el escáner." });
-      }
-    }, 100);
-  };
+        try {
+             await scannerRef.current.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 250 }, useBarCodeDetectorIfSupported: true },
+                (decodedText: string, result: Html5QrcodeResult) => onScanSuccess(decodedText),
+                (errorMessage: string, result: Html5QrcodeResult) => onScanFailure(errorMessage),
+            );
+        } catch (err: any) {
+            console.error("Camera start error:", err);
+            let message = "No se pudo iniciar la cámara. Intenta de nuevo o usa un archivo.";
+            if(err.name === 'NotReadableError') {
+                message = "La cámara ya está en uso por otra aplicación o pestaña."
+            } else if (err.name === 'NotAllowedError') {
+                message = "El permiso para usar la cámara fue denegado."
+            }
+            setError(message);
+            setIsScanning(false);
+        }
+    };
 
-  const stopScanner = async () => {
-    if (scannerRef.current && scannerRef.current.isScanning) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current = null;
-      } catch (err) {
-        console.error("Stop error:", err);
-      }
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !scannerRef.current) return;
+        
+        stopScanner();
+        setError(null);
+
+        try {
+            const decodedText = await scannerRef.current.scanFile(file, false);
+            onScanSuccess(decodedText);
+        } catch (err) {
+            console.error("File scan error:", err);
+            setError("No se encontró un código QR válido en la imagen.");
+            toast({
+                variant: "destructive",
+                title: "Error de Lectura",
+                description: "La imagen no contiene un QR reconocible.",
+            });
+        } finally {
+             if(fileInputRef.current) fileInputRef.current.value = '';
+        }
     }
-    setShowScanner(false);
-  };
 
-  const handleScanSuccess = (data: string) => {
-    setIsMarked(true);
-    onMark('entry', location!);
-    toast({ title: "Marcado exitoso" });
-    setTimeout(() => setIsMarked(false), 3000);
-  };
+    return (
+        <Card className="border-dashed border-red-200 bg-red-50 shadow-md rounded-2xl mt-4">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-red-800"> 
+                    <QrCode/> Registro Institucional
+                </CardTitle>
+                <CardDescription className="text-red-900/80">
+                    Escanea el código de la sede para validar tu asistencia.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {/* The reader element is always in the DOM but hidden */} 
+                <div 
+                    id={readerId}
+                    className="w-full bg-slate-900 rounded-lg overflow-hidden"
+                    style={{ display: isScanning ? 'block' : 'none' }}
+                />
 
-  return (
-    <Card className="border-none shadow-xl bg-gradient-to-br from-primary to-primary/80 text-white overflow-hidden relative">
-      <div className="absolute top-0 right-0 p-8 opacity-10">
-        <QrCode className="h-32 w-32" />
-      </div>
-      
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Scan className="h-5 w-5" />
-          Registro Institucional
-        </CardTitle>
-        <CardDescription className="text-primary-foreground/80">
-          Escanea el código de la sede para validar tu asistencia.
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="flex flex-col items-center gap-4">
-        <div className="w-full max-w-[240px] aspect-square bg-white rounded-2xl p-2 flex items-center justify-center shadow-lg relative overflow-hidden">
-          {showScanner ? (
-            <div id="dashboard-scanner" className="w-full h-full bg-black rounded-xl"></div>
-          ) : isMarked ? (
-            <div className="flex flex-col items-center text-green-500 animate-in zoom-in-95">
-              <CheckCircle2 className="h-16 w-16" />
-              <p className="text-[10px] mt-2 font-black">REGISTRO EXITOSO</p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3">
-              <QrCode className="h-20 w-20 text-slate-200" />
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Listo para escanear</p>
-            </div>
-          )}
-          
-          {showScanner && (
-            <button 
-              onClick={stopScanner}
-              className="absolute top-2 right-2 p-1 bg-white/20 hover:bg-white/40 rounded-full z-20 backdrop-blur-sm"
-            >
-              <X className="h-4 w-4 text-white" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 text-[10px] bg-black/20 px-3 py-1.5 rounded-full font-bold">
-          <MapPin className="h-3 w-3" />
-          {location ? `UBICACIÓN: ${location.latitude.toFixed(3)}, ${location.longitude.toFixed(3)}` : "OBTENIENDO GPS..."}
-        </div>
-
-        {!showScanner ? (
-          <Button 
-            onClick={startScanner} 
-            disabled={isMarked || !location}
-            className="w-full bg-white text-primary hover:bg-white/90 font-black uppercase tracking-widest h-12 rounded-xl"
-          >
-            <Camera className="h-4 w-4" /> Activar Escáner
-          </Button>
-        ) : (
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-tighter opacity-70">
-            <Loader2 className="h-3 w-3 animate-spin" /> Buscando código QR...
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+                {error && (
+                    <div className='p-3 bg-red-100 text-red-700 text-xs font-bold rounded-lg flex items-center gap-2'>
+                        <AlertCircle className="h-4 w-4"/> {error}
+                    </div>
+                )}
+                
+                <div className="grid grid-cols-2 gap-2">
+                    {!isScanning ? (
+                        <Button onClick={startScanner} className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-bold flex items-center gap-2 rounded-xl shadow-lg">
+                            <Camera /> Activar Escáner
+                        </Button>
+                    ) : (
+                        <Button onClick={stopScanner} variant="outline" className="w-full h-12 bg-white/50 border-red-200 font-bold flex items-center gap-2 rounded-xl">
+                            <X /> Cancelar
+                        </Button>
+                    )}
+                    <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full h-12 bg-white/50 border-red-200 font-bold flex items-center gap-2 rounded-xl" disabled={isScanning}>
+                        <Upload className="h-4 w-4"/> Archivo
+                    </Button>
+                    <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                </div>
+            </CardContent>
+        </Card>
+    );
+};

@@ -1,41 +1,55 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
     function isSignedIn() { return request.auth != null; }
-    function isAdmin() { return isSignedIn() && exists(/databases/$(database)/documents/roles_admins/$(request.auth.uid)); }
-    function isCoordinator() { return isSignedIn() && exists(/databases/$(database)/documents/roles_coordinators/$(request.auth.uid)); }
-    function isPrivileged() { return isAdmin() || isCoordinator(); }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/userProfiles/$(request.auth.uid)).data.role;
+    }
+    function isAdmin() {
+      return isSignedIn() && getUserRole() == 'admin';
+    }
+    function isCoordinator() {
+      return isSignedIn() && getUserRole() == 'coordinator';
+    }
+    function isPrivileged() {
+      return isAdmin() || isCoordinator();
+    }
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
 
     match /userProfiles/{userId} {
-      // Permitir lectura pública de perfiles para el escáner (solo datos necesarios)
-      allow read: if true;
-      allow create: if isPrivileged() || (isSignedIn() && request.auth.uid == userId);
-      allow update: if isPrivileged() || (isSignedIn() && request.auth.uid == userId && (request.resource.data.role == resource.data.role || !('role' in request.resource.data)));
+      allow read: if isPrivileged() || isOwner(userId);
+      allow create: if isPrivileged() || isOwner(userId);
+      allow update: if isPrivileged() || (isOwner(userId) && (request.resource.data.role == resource.data.role || !('role' in request.resource.data)));
       allow delete: if isAdmin();
+
+      match /attendanceRecords/{recordId} {
+        allow read: if isPrivileged() || isOwner(userId);
+        allow create, update: if isPrivileged() || isOwner(userId);
+        allow delete: if isAdmin();
+      }
     }
 
     match /roles_admins/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == userId && !exists(/databases/$(database)/documents/roles_admins/$(userId));
-      allow update, delete: if isAdmin();
+      allow read: if isPrivileged();
+      allow write: if isAdmin();
     }
 
     match /roles_coordinators/{userId} {
-      allow read: if isSignedIn();
+      allow read: if isPrivileged();
       allow write: if isAdmin();
     }
 
     match /shifts/{shiftId} {
-      allow read: if true;
+      allow read: if isSignedIn();
       allow write: if isPrivileged();
     }
 
-    match /userProfiles/{userId}/attendanceRecords/{recordId} {
-      // Permitir que el escáner público escriba registros de asistencia
-      allow read: if true;
-      allow create, update: if true;
+    match /globalAttendanceRecords/{recordId} {
+      allow read: if isPrivileged();
+      allow create, update: if isSignedIn();
       allow delete: if isAdmin();
     }
   }

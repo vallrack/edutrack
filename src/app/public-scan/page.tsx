@@ -5,11 +5,11 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useFirebase } from "@/firebase";
 import { doc, getDoc, collection, query, where, getDocs, addDoc, setDoc, serverTimestamp, limit } from "firebase/firestore";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { QrCode, Loader2, CheckCircle2, XCircle, Clock, MapPin, ArrowLeft, Camera } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Clock, MapPin, ArrowLeft, Camera, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -22,46 +22,47 @@ export default function PublicScanPage() {
   const [processing, setProcessing] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [clientTime, setClientTime] = useState("--:--");
+
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const checkPermissions = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        setHasCameraPermission(true);
-        stream.getTracks().forEach(track => track.stop());
-        startScanner();
-      } catch (err) {
-        console.error("Error accessing camera:", err);
-        setHasCameraPermission(false);
-      }
-    };
+    const updateClock = () => setClientTime(format(new Date(), 'HH:mm'));
+    updateClock();
+    const timerId = setInterval(updateClock, 1000 * 30);
+    return () => clearInterval(timerId);
+  }, []);
 
-    checkPermissions();
-
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const html5QrCode = new Html5Qrcode("reader");
+      scannerRef.current = html5QrCode;
+      checkPermissionsAndStart();
+    }
     return () => {
       stopScanner();
     };
   }, []);
 
-  const startScanner = async () => {
-    if (scannerRef.current) return;
-
+  const checkPermissionsAndStart = async () => {
     try {
-      const html5QrCode = new Html5Qrcode("reader");
-      scannerRef.current = html5QrCode;
-      setIsScanning(true);
-
-      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-      
-      await html5QrCode.start(
-        { facingMode: "environment" },
-        config,
-        onScanSuccess,
-        onScanFailure
-      );
+      await navigator.mediaDevices.getUserMedia({ video: true });
+      setHasCameraPermission(true);
+      startScanner();
     } catch (err) {
-      console.error("Failed to start scanner:", err);
+      console.error("Camera permission error:", err);
+      setHasCameraPermission(false);
+    }
+  };
+
+  const startScanner = async () => {
+    if (!scannerRef.current || scannerRef.current.isScanning) return;
+    try {
+      setIsScanning(true);
+      const config = { fps: 5, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true };
+      await scannerRef.current.start({ facingMode: "environment" }, config, onScanSuccess, () => {});
+    } catch (err) {
       setIsScanning(false);
     }
   };
@@ -70,113 +71,107 @@ export default function PublicScanPage() {
     if (scannerRef.current && scannerRef.current.isScanning) {
       try {
         await scannerRef.current.stop();
-        scannerRef.current = null;
-        setIsScanning(false);
-      } catch (err) {
-        console.error("Failed to stop scanner:", err);
-      }
+      } catch (err) {}
     }
+    setIsScanning(false);
   };
 
-  async function onScanSuccess(decodedText: string) {
+  const processQrCode = async (decodedText: string) => {
     if (processing) return;
     setProcessing(true);
     setError(null);
 
+    if (scannerRef.current?.isScanning) {
+      scannerRef.current.pause();
+    }
+
     try {
       const data = JSON.parse(decodedText);
-      if (!data.id) throw new Error("QR inválido: No se encontró ID del docente.");
+      if (!data.id) throw new Error("QR inválido: No se encontró ID.");
 
       const teacherRef = doc(firestore, 'userProfiles', data.id);
       const teacherSnap = await getDoc(teacherRef);
+      if (!teacherSnap.exists()) throw new Error("Docente no encontrado.");
 
-      if (!teacherSnap.exists()) {
-        throw new Error("Docente no encontrado en la base de datos.");
-      }
-
-      const teacher = teacherSnap.data();
+      const teacher = { id: teacherSnap.id, ...teacherSnap.data() };
       const now = new Date();
-      const currentDay = now.getDay();
       const todayStr = format(now, 'yyyy-MM-dd');
+      const currentDay = now.getDay();
 
-      const shifts: any[] = [];
-      for (const sid of (teacher.shiftIds || [])) {
-        const sSnap = await getDoc(doc(firestore, 'shifts', sid));
-        if (sSnap.exists()) shifts.push({ ...sSnap.data(), id: sSnap.id });
+      let todayShift = null;
+      if (teacher.shiftIds && teacher.shiftIds.length > 0) {
+        const shiftDocs = await Promise.all(teacher.shiftIds.map((sid: string) => getDoc(doc(firestore, 'shifts', sid))));
+        const shiftsWithIds = shiftDocs
+          .filter(doc => doc.exists())
+          .map(doc => ({ id: doc.id, ...doc.data() }));
+        todayShift = shiftsWithIds.find(s => s.days?.includes(currentDay));
+      }
+      
+      if (!todayShift || !todayShift.id) {
+        throw new Error(`Sin jornadas programadas para hoy.`);
       }
 
-      const todayShift = shifts.find(s => s.days?.includes(currentDay));
-
-      if (!todayShift) {
-        throw new Error(`Sin jornadas programadas para hoy (${format(now, 'EEEE')}).`);
-      }
-
-      const recordsRef = collection(firestore, 'userProfiles', teacher.id, 'attendanceRecords');
-      const todayQuery = query(recordsRef, where('date', '==', todayStr), where('shiftId', '==', todayShift.id), limit(1));
+      const userRecordsRef = collection(firestore, 'userProfiles', teacher.id, 'attendanceRecords');
+      const globalRecordsRef = collection(firestore, 'globalAttendanceRecords');
+      const todayQuery = query(userRecordsRef, where('date', '==', todayStr), where('shiftId', '==', todayShift.id), limit(1));
       const querySnapshot = await getDocs(todayQuery);
 
       let status = "";
-      const attendanceData: any = {
-        userId: teacher.id,
-        shiftId: todayShift.id,
-        date: todayStr,
-        updatedAt: serverTimestamp()
-      };
-
       if (querySnapshot.empty) {
-        attendanceData.entryDateTime = now.toISOString();
-        attendanceData.entryMethod = 'qr-public';
-        attendanceData.createdAt = serverTimestamp();
-        await addDoc(recordsRef, attendanceData);
+        const attendanceData = { userId: teacher.id, shiftId: todayShift.id, date: todayStr, entryDateTime: now.toISOString(), entryMethod: 'qr-public', createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+        const newDocRef = doc(userRecordsRef);
+        await setDoc(newDocRef, attendanceData);
+        await setDoc(doc(globalRecordsRef, newDocRef.id), attendanceData);
         status = "ENTRADA REGISTRADA";
       } else {
-        const existingRecord = querySnapshot.docs[0].data();
-        if (existingRecord.exitDateTime) {
-          throw new Error("Salida ya registrada hoy.");
-        }
-        attendanceData.exitDateTime = now.toISOString();
-        attendanceData.exitMethod = 'qr-public';
-        await setDoc(doc(recordsRef, querySnapshot.docs[0].id), attendanceData, { merge: true });
+        const recordDoc = querySnapshot.docs[0];
+        if (recordDoc.data().exitDateTime) throw new Error("La salida ya ha sido registrada hoy.");
+
+        const updateData = { exitDateTime: now.toISOString(), exitMethod: 'qr-public', updatedAt: serverTimestamp() };
+        await setDoc(recordDoc.ref, updateData, { merge: true });
+        await setDoc(doc(globalRecordsRef, recordDoc.id), updateData, { merge: true });
         status = "SALIDA REGISTRADA";
       }
 
-      setLastResult({
-        teacher: `${teacher.firstName} ${teacher.lastName}`,
-        shift: todayShift.name,
-        time: format(now, 'HH:mm'),
-        status
-      });
-
+      setLastResult({ teacher: `${teacher.firstName} ${teacher.lastName}`, shift: todayShift.name, time: format(now, 'HH:mm'), status });
       toast({ title: status });
-
-      setTimeout(() => {
-        setLastResult(null);
-        setProcessing(false);
-      }, 4000);
 
     } catch (err: any) {
       setError(err.message || "Error al procesar el código.");
-      setProcessing(false);
-      setTimeout(() => setError(null), 4000);
+    } finally {
+      setTimeout(() => {
+        if (scannerRef.current?.getState() === Html5QrcodeScannerState.PAUSED) {
+          scannerRef.current.resume();
+        }
+        setProcessing(false);
+        setLastResult(null);
+        setError(null);
+      }, 4000);
     }
-  }
+  };
 
-  function onScanFailure() {
-    // Escaneo continuo sin errores en consola
-  }
+  const onScanSuccess = (decodedText: string) => {
+    if (!processing) processQrCode(decodedText);
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !scannerRef.current) return;
+    try {
+      const decodedText = await scannerRef.current.scanFile(file, false);
+      onScanSuccess(decodedText);
+    } catch (err) {
+      setError("No se encontró un código QR válido en la imagen.");
+    }
+    event.target.value = ''; // Reset file input
+  };
 
   return (
     <div className="min-h-screen bg-[#F1F3F6] flex flex-col items-center justify-center p-4">
       <div className="max-w-2xl w-full space-y-8">
         <header className="flex flex-col items-center gap-4 text-center">
           <div className="relative h-12 w-60 md:h-16 md:w-72">
-            <Image 
-              src="https://ciudaddonbosco.org/wp-content/uploads/2025/07/CIUDAD-DON-BOSCO_CABECERA-04-1024x284.png" 
-              alt="Ciudad Don Bosco" 
-              fill
-              className="object-contain"
-              priority
-            />
+            <Image src="https://ciudaddonbosco.org/wp-content/uploads/2025/07/CIUDAD-DON-BOSCO_CABECERA-04-1024x284.png" alt="Ciudad Don Bosco" fill sizes="(max-width: 768px) 15rem, 18rem" className="object-contain" priority />
           </div>
           <div>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Estación de Marcaje QR</h1>
@@ -187,22 +182,13 @@ export default function PublicScanPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           <Card className="border-none shadow-2xl rounded-3xl overflow-hidden bg-white relative">
             <CardHeader className="bg-primary text-white p-6">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Camera className="h-4 w-4" /> CÁMARA EN VIVO
-              </CardTitle>
+              <CardTitle className="text-sm flex items-center gap-2"><Camera className="h-4 w-4" /> CÁMARA EN VIVO</CardTitle>
             </CardHeader>
             <CardContent className="p-0 bg-slate-900 aspect-square flex items-center justify-center overflow-hidden">
               <div id="reader" className="w-full h-full"></div>
-              
               {hasCameraPermission === false && (
-                <div className="p-6 text-center">
-                  <Alert variant="destructive">
-                    <AlertTitle>Acceso Denegado</AlertTitle>
-                    <AlertDescription>Por favor, permite el acceso a la cámara en los ajustes de tu navegador.</AlertDescription>
-                  </Alert>
-                </div>
+                <Alert variant="destructive" className="m-4"><AlertTitle>Acceso Denegado</AlertTitle><AlertDescription>Permite el acceso a la cámara en tu navegador.</AlertDescription></Alert>
               )}
-
               {processing && (
                 <div className="absolute inset-0 bg-white/60 backdrop-blur-md flex flex-col items-center justify-center gap-4 z-20">
                   <Loader2 className="h-12 w-12 text-primary animate-spin" />
@@ -214,71 +200,33 @@ export default function PublicScanPage() {
 
           <div className="space-y-6">
             {lastResult ? (
-              <Card className="border-none shadow-2xl bg-green-50 border-2 border-green-200 rounded-3xl animate-in zoom-in-95 duration-300">
-                <CardContent className="p-8 flex flex-col items-center text-center gap-4">
-                  <div className="h-16 w-16 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg">
-                    <CheckCircle2 className="h-10 w-10" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black text-green-900 uppercase tracking-tight">{lastResult.status}</h3>
-                    <p className="text-sm font-bold text-green-700 mt-1">{lastResult.teacher}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 w-full pt-4 border-t border-green-200">
-                    <div>
-                      <p className="text-[10px] font-black text-green-400 uppercase">Jornada</p>
-                      <p className="text-xs font-bold text-green-800 uppercase">{lastResult.shift}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-green-400 uppercase">Hora</p>
-                      <p className="text-xs font-bold text-green-800 uppercase">{lastResult.time}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                <Card className="border-none shadow-2xl bg-green-50 border-2 border-green-200 rounded-3xl animate-in zoom-in-95 duration-300">
+                    <CardContent className="p-8 flex flex-col items-center text-center gap-4"><div className="h-16 w-16 bg-green-500 rounded-full flex items-center justify-center text-white shadow-lg"><CheckCircle2 className="h-10 w-10" /></div><div><h3 className="text-xl font-black text-green-900 uppercase tracking-tight">{lastResult.status}</h3><p className="text-sm font-bold text-green-700 mt-1">{lastResult.teacher}</p></div><div className="grid grid-cols-2 gap-4 w-full pt-4 border-t border-green-200"><div><p className="text-[10px] font-black text-green-400 uppercase">Jornada</p><p className="text-xs font-bold text-green-800 uppercase">{lastResult.shift}</p></div><div><p className="text-[10px] font-black text-green-400 uppercase">Hora</p><p className="text-xs font-bold text-green-800 uppercase">{lastResult.time}</p></div></div></CardContent>
+                </Card>
             ) : error ? (
-              <Card className="border-none shadow-2xl bg-red-50 border-2 border-red-200 rounded-3xl animate-in shake duration-300">
-                <CardContent className="p-8 flex flex-col items-center text-center gap-4">
-                  <div className="h-16 w-16 bg-red-500 rounded-full flex items-center justify-center text-white shadow-lg">
-                    <XCircle className="h-10 w-10" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black text-red-900 uppercase tracking-tight">ERROR DE LECTURA</h3>
-                    <p className="text-xs font-bold text-red-700 mt-2 leading-relaxed">{error}</p>
-                  </div>
-                </CardContent>
-              </Card>
+                <Card className="border-none shadow-2xl bg-red-50 border-2 border-red-200 rounded-3xl animate-in shake duration-300">
+                    <CardContent className="p-8 flex flex-col items-center text-center gap-4"><div className="h-16 w-16 bg-red-500 rounded-full flex items-center justify-center text-white shadow-lg"><XCircle className="h-10 w-10" /></div><div><h3 className="text-xl font-black text-red-900 uppercase tracking-tight">ERROR DE LECTURA</h3><p className="text-xs font-bold text-red-700 mt-2 leading-relaxed">{error}</p></div></CardContent>
+                </Card>
             ) : (
               <Card className="border-none shadow-xl bg-white rounded-3xl">
-                <CardHeader>
-                  <CardTitle className="text-md font-black uppercase text-slate-800 tracking-tight">Punto de Marcaje</CardTitle>
-                  <CardDescription>Escanee su carnet institucional aquí.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">1</div>
-                    <p className="text-xs text-slate-600">Muestre su <b>Código QR</b> a la cámara.</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">2</div>
-                    <p className="text-xs text-slate-600">Aumente el brillo de su dispositivo móvil.</p>
-                  </div>
-                </CardContent>
+                <CardHeader><CardTitle className="text-md font-black uppercase text-slate-800 tracking-tight">Punto de Marcaje</CardTitle><CardDescription>Escanee su carnet institucional aquí.</CardDescription></CardHeader>
+                <CardContent className="space-y-4"><div className="flex items-start gap-3"><div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">1</div><p className="text-xs text-slate-600">Muestre su <b>Código QR</b> a la cámara.</p></div><div className="flex items-start gap-3"><div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary">2</div><p className="text-xs text-slate-600">O seleccione una <b>imagen</b> con el botón de abajo.</p></div></CardContent>
               </Card>
             )}
 
             <div className="flex flex-col gap-3">
-              <Link href="/" className="w-full">
-                <Button variant="outline" className="w-full h-12 gap-2 font-black uppercase tracking-widest rounded-2xl border-slate-200">
-                  <ArrowLeft className="h-4 w-4" /> Volver al Inicio
+                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                <Button variant="outline" className="w-full h-12 gap-3 font-bold uppercase tracking-widest rounded-xl border-slate-200 shadow-md" onClick={() => fileInputRef.current?.click()}>
+                    <Upload className="h-4 w-4" /> Escanear desde Archivo
                 </Button>
-              </Link>
+                <Link href="/" className="w-full">
+                    <Button variant="outline" className="w-full h-12 gap-2 font-black uppercase tracking-widest rounded-xl border-slate-200">
+                    <ArrowLeft className="h-4 w-4" /> Volver al Inicio
+                    </Button>
+                </Link>
               <div className="flex justify-center gap-4 text-slate-400">
-                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest">
-                  <Clock className="h-3 w-3" /> {format(new Date(), 'HH:mm')}
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest">
-                  <MapPin className="h-3 w-3" /> SEDE CENTRAL
-                </div>
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest"><Clock className="h-3 w-3" /> {clientTime}</div>
+                <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest"><MapPin className="h-3 w-3" /> SEDE CENTRAL</div>
               </div>
             </div>
           </div>

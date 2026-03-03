@@ -1,207 +1,186 @@
 
-"use client";
+"use client"
 
-import { useFirebase, useDoc, useMemoFirebase, useUser } from "@/firebase";
-import { Navbar } from "@/components/layout/Navbar";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { FileText, Table as TableIcon, Download, Loader2 } from "lucide-react";
-import { format, subDays, differenceInMinutes } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { doc, collection, getDocs, query, where } from "firebase/firestore";
-import { useRouter } from "next/navigation";
-import { signOut } from "firebase/auth";
 import { useState } from "react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
+import { useFirebase, useCollection, useDoc, useMemoFirebase } from "@/firebase";
+import { Navbar } from "@/components/layout/Navbar";
+import { collection, query, where, getDocs, orderBy, doc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, FileDown, FileText } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { DateRange } from "react-day-picker";
 
-export default function ReportsAdminPage() {
-  const { firestore, auth } = useFirebase();
-  const { user } = useUser();
-  const { toast } = useToast();
-  const router = useRouter();
-  const [isExporting, setIsExporting] = useState(false);
+interface ReportRecord extends Record<string, any> {
+  id: string;
+  userName: string;
+  shiftName: string;
+}
 
-  // Fetch current user profile for Navbar
-  const profileRef = useMemoFirebase(() => 
-    user ? doc(firestore, 'userProfiles', user.uid) : null, 
-  [firestore, user]);
+export default function ReportsPage() {
+  const { firestore, user, auth, isUserLoading } = useFirebase();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [selectedTeacher, setSelectedTeacher] = useState<string>("all");
+  const [reportData, setReportData] = useState<ReportRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const profileRef = useMemoFirebase(() => user ? doc(firestore, 'userProfiles', user.uid) : null, [firestore, user]);
   const { data: profile } = useDoc(profileRef);
+
+  const teachersQuery = useMemoFirebase(() => 
+    firestore ? query(collection(firestore, "userProfiles"), where("role", "==", "teacher")) : null,
+    [firestore]
+  );
+  const { data: teachers, isLoading: teachersLoading } = useCollection(teachersQuery);
+  
+  const shiftsQuery = useMemoFirebase(() => 
+    firestore ? collection(firestore, "shifts") : null,
+    [firestore]
+  );
+  const { data: shifts, isLoading: shiftsLoading } = useCollection(shiftsQuery);
 
   const handleLogout = async () => {
     await signOut(auth);
-    router.push("/");
   };
 
-  const generateReportData = async () => {
-    const teachersQuery = query(collection(firestore, 'userProfiles'), where('role', '==', 'teacher'));
-    const teachersSnapshot = await getDocs(teachersQuery);
-    
-    const reportRows: any[] = [];
+  const handleGenerateReport = async () => {
+    if (!dateRange?.from || !dateRange?.to) {
+      alert("Por favor, selecciona un rango de fechas.");
+      return;
+    }
+    setIsLoading(true);
+    setReportData([]);
 
-    for (const teacherDoc of teachersSnapshot.docs) {
-      const teacherData = teacherDoc.data();
-      const recordsRef = collection(firestore, 'userProfiles', teacherDoc.id, 'attendanceRecords');
-      const recordsSnapshot = await getDocs(recordsRef);
+    let q = query(
+      collection(firestore, "globalAttendanceRecords"),
+      where("date", ">=", format(dateRange.from, "yyyy-MM-dd")),
+      where("date", "<=", format(dateRange.to, "yyyy-MM-dd")),
+      orderBy("date", "desc")
+    );
 
-      recordsSnapshot.forEach(recordDoc => {
-        const record = recordDoc.data();
-        let minutesWorked = 0;
-        
-        if (record.entryDateTime && record.exitDateTime) {
-          minutesWorked = differenceInMinutes(new Date(record.exitDateTime), new Date(record.entryDateTime));
-        }
-
-        reportRows.push({
-          docente: `${teacherData.firstName} ${teacherData.lastName}`,
-          correo: teacherData.email,
-          fecha: record.date,
-          entrada: record.entryDateTime ? format(new Date(record.entryDateTime), 'HH:mm') : '---',
-          salida: record.exitDateTime ? format(new Date(record.exitDateTime), 'HH:mm') : '---',
-          horas: (minutesWorked / 60).toFixed(2),
-          metodo: record.entryMethod || 'manual'
-        });
-      });
+    if (selectedTeacher !== "all") {
+      q = query(q, where("userId", "==", selectedTeacher));
     }
 
-    return reportRows;
-  };
-
-  const handleExportPDF = async () => {
-    setIsExporting(true);
     try {
-      const data = await generateReportData();
-      const doc = new jsPDF();
-      
-      doc.text("Ciudad Don Bosco - Reporte de Asistencia", 14, 15);
-      doc.setFontSize(10);
-      doc.text(`Generado el: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 22);
-
-      autoTable(doc, {
-        startY: 30,
-        head: [['Docente', 'Fecha', 'Entrada', 'Salida', 'Horas', 'Método']],
-        body: data.map(row => [row.docente, row.fecha, row.entrada, row.salida, row.horas, row.metodo]),
-        theme: 'striped',
-        headStyles: { fillColor: [204, 38, 38] } // Rojo Institucional
+      const querySnapshot = await getDocs(q);
+      const data: ReportRecord[] = querySnapshot.docs.map(doc => {
+        const record = doc.data();
+        const teacher = teachers?.find(t => t.id === record.userId);
+        const shift = shifts?.find(s => s.id === record.shiftId);
+        return {
+          id: doc.id,
+          date: record.date,
+          entryDateTime: record.entryDateTime,
+          exitDateTime: record.exitDateTime,
+          isManualOverride: record.isManualOverride,
+          userName: teacher ? `${teacher.firstName} ${teacher.lastName}` : "Desconocido",
+          shiftName: shift ? shift.name : "Jornada Única",
+        };
       });
-
-      doc.save(`don_bosco_reporte_${format(new Date(), 'yyyyMMdd')}.pdf`);
-      toast({ title: "PDF Generado", description: "El reporte se ha descargado correctamente." });
+      setReportData(data);
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "No se pudo generar el PDF." });
+      console.error("Error generating report: ", error);
+      alert("Ocurrió un error al generar el informe.");
     } finally {
-      setIsExporting(false);
+      setIsLoading(false);
     }
   };
 
-  const handleExportExcel = async () => {
-    setIsExporting(true);
-    try {
-      const data = await generateReportData();
-      const worksheet = XLSX.utils.json_to_sheet(data);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Asistencia");
-      
-      XLSX.writeFile(workbook, `don_bosco_nomina_${format(new Date(), 'yyyyMMdd')}.xlsx`);
-      toast({ title: "Excel Generado", description: "El archivo de nómina está listo." });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "No se pudo generar el Excel." });
-    } finally {
-      setIsExporting(false);
-    }
+  const renderStatusBadge = (record: any) => {
+    if (record.isManualOverride) return <Badge className="bg-sky-100 text-sky-800">COMPLETO</Badge>;
+    if (record.exitDateTime) return <Badge className="bg-green-100 text-green-800">CUMPLIDO</Badge>;
+    if (record.entryDateTime) return <Badge className="bg-amber-100 text-amber-800">EN PROCESO</Badge>;
+    return <Badge variant="secondary">PENDIENTE</Badge>;
   };
 
-  const navbarUser = profile ? {
-    id: profile.id,
-    name: `${profile.firstName} ${profile.lastName}`,
-    role: profile.role,
-    email: profile.email
-  } : user ? {
-    id: user.uid,
-    name: user.displayName || 'Cargando...',
-    role: 'admin' as any,
-    email: user.email || ''
-  } : null;
+  if (isUserLoading || !profile) {
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#F1F3F6]">
-      <Navbar user={navbarUser} onLogout={handleLogout} />
-      
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <header>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Generador de Reportes</h1>
-          <p className="text-muted-foreground">Exportación de datos de nómina y cumplimiento real</p>
-        </header>
-
-        <Card className="border-none shadow-xl rounded-2xl overflow-hidden">
-          <CardHeader className="bg-white">
-            <CardTitle>Configuración del Reporte</CardTitle>
-            <CardDescription>Filtre los datos para generar el acumulado de horas.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 bg-white p-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-muted-foreground tracking-widest">Periodo</label>
-                <Select defaultValue="monthly">
-                  <SelectTrigger className="h-11 bg-slate-50 border-none shadow-inner">
-                    <SelectValue placeholder="Seleccione periodo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="weekly">Semanal</SelectItem>
-                    <SelectItem value="biweekly">Quincenal</SelectItem>
-                    <SelectItem value="monthly">Mensual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-muted-foreground tracking-widest">Desde</label>
-                <div className="h-11 px-3 border-none rounded-md flex items-center bg-slate-50 shadow-inner text-sm font-medium">
-                  {format(subDays(new Date(), 30), 'dd/MM/yyyy')}
+      <Navbar user={{ id: user.uid, name: `${profile.firstName} ${profile.lastName}`, role: profile.role, email: profile.email }} onLogout={handleLogout} />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+        <div className="space-y-6">
+            <Card className="border-none shadow-lg bg-white rounded-2xl">
+                <CardHeader>
+                <CardTitle>Generador de Informes de Asistencia</CardTitle>
+                <CardDescription>Filtra y genera informes de asistencia por fecha y docente.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+                    <Select value={selectedTeacher} onValueChange={setSelectedTeacher} disabled={teachersLoading}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar docente..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todos los docentes</SelectItem>
+                        {teachers?.map(teacher => (
+                        <SelectItem key={teacher.id} value={teacher.id}>
+                            {teacher.firstName} {teacher.lastName}
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                    <Button onClick={handleGenerateReport} disabled={isLoading} className="h-12 md:h-auto font-bold text-lg">
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Generar Informe
+                    </Button>
                 </div>
-              </div>
-            </div>
+                </CardContent>
+            </Card>
 
-            <div className="pt-6 space-y-4">
-              <p className="text-sm font-bold text-slate-700">Formatos de Salida</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Button 
-                  disabled={isExporting}
-                  onClick={handleExportPDF}
-                  className="h-28 flex-col gap-2 bg-white text-slate-900 border border-slate-100 hover:bg-slate-50 shadow-md hover:shadow-lg transition-all"
-                >
-                  {isExporting ? <Loader2 className="h-10 w-10 animate-spin text-primary" /> : <FileText className="h-10 w-10 text-red-500" />}
-                  <span className="font-bold">Reporte PDF</span>
-                  <span className="text-[10px] text-muted-foreground">Visualización y archivo</span>
-                </Button>
-                <Button 
-                  disabled={isExporting}
-                  onClick={handleExportExcel}
-                  className="h-28 flex-col gap-2 bg-white text-slate-900 border border-slate-100 hover:bg-slate-50 shadow-md hover:shadow-lg transition-all"
-                >
-                  {isExporting ? <Loader2 className="h-10 w-10 animate-spin text-primary" /> : <TableIcon className="h-10 w-10 text-green-500" />}
-                  <span className="font-bold">Excel / XLSX</span>
-                  <span className="text-[10px] text-muted-foreground">Integración con Nómina</span>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-lg bg-primary/5 rounded-2xl">
-          <CardContent className="p-6 flex items-start gap-4">
-            <div className="p-3 bg-primary/10 rounded-xl text-primary">
-              <Download className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="font-bold text-slate-800">Cálculo Automático de Horas</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                El sistema procesa todos los registros de la base de datos para calcular la diferencia exacta entre entradas y salidas.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            {reportData.length > 0 && (
+                <Card className="border-none shadow-lg bg-white rounded-2xl">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                            <CardTitle>Resultados del Informe</CardTitle>
+                            <CardDescription>Se encontraron {reportData.length} registros.</CardDescription>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="outline"><FileText className="mr-2 h-4 w-4"/> Exportar a PDF</Button>
+                            <Button variant="outline"><FileDown className="mr-2 h-4 w-4"/> Exportar a Excel</Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                <TableHead>Docente</TableHead>
+                                <TableHead>Fecha</TableHead>
+                                <TableHead>Jornada</TableHead>
+                                <TableHead>Entrada</TableHead>
+                                <TableHead>Salida</TableHead>
+                                <TableHead className="text-right">Estado</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {reportData.map((record) => (
+                                <TableRow key={record.id}>
+                                    <TableCell className="font-medium">{record.userName}</TableCell>
+                                    <TableCell>{format(parseISO(record.date), "dd/MM/yyyy")}</TableCell>
+                                    <TableCell>{record.shiftName}</TableCell>
+                                    <TableCell>{record.entryDateTime ? format(parseISO(record.entryDateTime), "HH:mm:ss") : "--:--"}</TableCell>
+                                    <TableCell>{record.exitDateTime ? format(parseISO(record.exitDateTime), "HH:mm:ss") : "--:--"}</TableCell>
+                                    <TableCell className="text-right">{renderStatusBadge(record)}</TableCell>
+                                </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
+            { !isLoading && reportData.length === 0 &&
+                <div className="text-center py-10"><p className="text-muted-foreground">No se encontraron registros para los filtros seleccionados.</p></div>
+            }
+        </div>
       </main>
     </div>
   );
